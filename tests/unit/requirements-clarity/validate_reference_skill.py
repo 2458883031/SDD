@@ -57,6 +57,33 @@ def check(cond, msg):
         errors.append(msg)
 
 
+def validate_optional_caps(value):
+    """Validate an optional_capabilities list and return error strings."""
+    if not isinstance(value, list):
+        return ["optional_capabilities must be a list"]
+    if not all(isinstance(cap, str) for cap in value):
+        return ["optional_capabilities must contain only strings"]
+    errs = []
+    seen = set()
+    duplicates = []
+    for cap in value:
+        if cap in seen and cap not in duplicates:
+            duplicates.append(cap)
+        seen.add(cap)
+    if duplicates:
+        errs.append(f"optional_capabilities contains duplicate IDs: {sorted(duplicates)}")
+    unknown = seen - REGISTRY
+    if unknown:
+        errs.append(f"optional_capabilities contains unknown IDs: {sorted(unknown)}")
+    required_declared = seen & set(REQUIRED_CAPS)
+    if required_declared:
+        errs.append(f"optional_capabilities must not contain required capabilities: {sorted(required_declared)}")
+    non_optional = seen - OPTIONAL_CAPS
+    if non_optional:
+        errs.append(f"optional_capabilities must only contain registered optional IDs: {sorted(non_optional)}")
+    return errs
+
+
 def load_json(path):
     with path.open(encoding="utf-8") as f:
         return json.load(f)
@@ -156,8 +183,11 @@ check(manifest.get("status") in {"draft", "review", "tested", "published", "depr
 check(manifest.get("compatibility", {}).get("requires_capabilities") == ["skill-discovery", "skill-metadata", "tool-invocation", "context-port", "artifact-port", "result-port"], "skill.yaml: capability registry mismatch")
 req_caps = manifest.get("compatibility", {}).get("requires_capabilities", [])
 opt_caps = manifest.get("compatibility", {}).get("optional_capabilities", [])
-check(set(req_caps) <= REGISTRY, "skill.yaml: unknown required capability")
-check(set(opt_caps) <= REGISTRY, "skill.yaml: unknown optional capability")
+check(isinstance(req_caps, list), "skill.yaml: requires_capabilities must be a list")
+if isinstance(req_caps, list):
+    check(set(req_caps) <= REGISTRY, "skill.yaml: unknown required capability")
+opt_errors = validate_optional_caps(opt_caps)
+check(not opt_errors, "skill.yaml: invalid optional_capabilities: " + "; ".join(opt_errors))
 check(manifest.get("dependencies", {}).get("tools") == ["file-read"], "skill.yaml: tool mapping must be file-read")
 
 # 2. JSON Schema checks
@@ -288,6 +318,30 @@ try:
 except Exception:
     negative_metadata_cases += 1
 
+# 4e. Optional capability classification (skill.yaml)
+optional_positive_cases = 0
+for value, case_name in (([], "empty"), (["approval-port"], "approval-port")):
+    errs = validate_optional_caps(value)
+    check(not errs, f"positive optional case '{case_name}' should pass: {errs}")
+    if not errs:
+        optional_positive_cases += 1
+
+optional_negative_cases = 0
+
+def expect_optional_failure(case_name, value, needle):
+    global optional_negative_cases
+    errs = validate_optional_caps(value)
+    check(bool(errs), f"negative optional case '{case_name}' should fail but passed")
+    check(any(needle in e for e in errs), f"negative optional case '{case_name}' missing error '{needle}': {errs}")
+    if errs and any(needle in e for e in errs):
+        optional_negative_cases += 1
+
+for cap in REQUIRED_CAPS:
+    expect_optional_failure(f"required-as-optional-{cap}", [cap], "required capabilities")
+expect_optional_failure("unknown-id", ["unknown-cap"], "unknown IDs")
+expect_optional_failure("wrong-type", "approval-port", "must be a list")
+expect_optional_failure("duplicate-id", ["approval-port", "approval-port"], "duplicate IDs")
+
 if errors:
     print("REFERENCE SKILL VALIDATION FAILED")
     for e in errors:
@@ -300,4 +354,5 @@ print(f"cases_input_validated={len(case_list)} invalid_cases_rejected={len(inval
 print(f"semver_valid={len(semver_valid)} semver_invalid={len(semver_invalid)}")
 print(f"yaml_blocks_checked={yaml_blocks} metadata_examples={metadata_examples} registry_ids={len(REGISTRY)}")
 print(f"negative_metadata_cases_passed={negative_metadata_cases}")
+print(f"optional_positive_cases_passed={optional_positive_cases} optional_negative_cases_passed={optional_negative_cases}")
 print(f"runtime_behavior=NOT_EXECUTED platform_entries={len(platform.get('skills', {}))}")
