@@ -180,7 +180,7 @@ P1-002 区分以下状态，不得混用：
 | SUCCEEDED | `succeeded` |
 | FAILED | `failed` |
 | SKIPPED | `skipped` |
-| CANCELLED | 无直接对应；记录为 `failed/aborted` 的取消原因 |
+| CANCELLED | 无直接对应；记录 `cancelled` 事件，不映射为 `succeeded`/`failed` |
 
 ---
 
@@ -225,6 +225,7 @@ P1-002 区分以下状态，不得混用：
 **规则：**
 
 - GateDecision 不可原地修改；重新评估创建新 `decision_id`。
+- `FAILED` 可因 subject 变化被 `INVALIDATED`；`INVALIDATED`/`EXPIRED` 为终态。
 - G4/G5 的 `subject_hash` 必须相同；不同则质量门禁不得 PASSED。
 - 生产部署 G6 不得自动批准；缺少人工审批只能 BLOCKED。
 - Gate 状态与 Task 状态独立；Task SUCCEEDED 不代表 Gate 通过。

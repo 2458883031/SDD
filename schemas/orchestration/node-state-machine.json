@@ -9,11 +9,11 @@
     "READY": "queued",
     "RUNNING": "executing",
     "WAITING": "blocked",
-    "BLOCKED": "awaiting_approval",
+    "BLOCKED": ["awaiting_approval", "blocked"],
     "SUCCEEDED": "succeeded",
     "FAILED": "failed",
     "SKIPPED": "skipped",
-    "CANCELLED": "aborted"
+    "CANCELLED": null
   },
   "transitions": [
     { "from": "PENDING", "to": "READY", "guard": "dependencies_satisfied_and_node_activated" },

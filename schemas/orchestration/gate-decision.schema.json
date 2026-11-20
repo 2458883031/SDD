@@ -50,9 +50,6 @@
     {
       "if": { "properties": { "gate_id": { "const": "G6" } }, "required": ["gate_id"] },
       "then": {
-        "properties": {
-          "subject_type": { "const": "commit" }
-        },
         "required": ["subject_hash"]
       }
     }

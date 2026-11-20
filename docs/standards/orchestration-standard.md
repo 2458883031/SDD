@@ -160,7 +160,7 @@ PENDING → RUNNING → SUCCEEDED
 
 ## 7. 失败、审批与证据
 
-- 失败分类、重试、超时、幂等、补偿、恢复：见 [task-standard.md](./task-standard.md) 与 [execution-evidence-standard.md](./execution-evidence-standard.md)。
+- 失败分类、重试、超时、幂等、补偿、恢复：见 [failure-recovery-standard.md](./failure-recovery-standard.md)、[task-standard.md](./task-standard.md) 与 [execution-evidence-standard.md](./execution-evidence-standard.md)。
 - G1–G6 的编排机制：见 [gate-orchestration-standard.md](./gate-orchestration-standard.md)。
 - Approval 对象、绑定、过期和失效：见 [approval-orchestration-standard.md](./approval-orchestration-standard.md)。
 - 上下文分层、证据、日志/事件/审计、观测指标：见 [execution-evidence-standard.md](./execution-evidence-standard.md)。

@@ -8,7 +8,7 @@
     "PENDING": "pending",
     "RUNNING": "running",
     "WAITING": "paused",
-    "BLOCKED": "awaiting_approval",
+    "BLOCKED": ["awaiting_approval", "paused"],
     "SUCCEEDED": "completed",
     "FAILED": "failed",
     "CANCELLED": "aborted"

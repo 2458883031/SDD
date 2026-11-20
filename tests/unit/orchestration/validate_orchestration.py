@@ -58,6 +58,7 @@ WORKFLOW_IDS = {
     "testing",
     "deployment",
     "documentation",
+    "release-composed",
 }
 
 
@@ -159,7 +160,7 @@ for path in approval_files:
 for path in evidence_files:
     expect_schema_valid(evidence_schema, load_json(path), path.name, positive)
 
-check(len(workflow_files) == 9, f"expected 9 workflow examples, got {len(workflow_files)}")
+check(len(workflow_files) >= 9, f"expected at least 9 workflow examples, got {len(workflow_files)}")
 check(len(task_files) >= 2, "expected at least 2 task examples")
 check(len(gate_files) >= 2, "expected at least 2 gate examples")
 check(len(approval_files) >= 1, "expected at least 1 approval example")
@@ -235,10 +236,21 @@ gate_bad_id = copy.deepcopy(base_gate)
 gate_bad_id["gate_id"] = "G7"
 expect_schema_invalid(gate_schema, gate_bad_id, "gate-invalid-id", negative)
 
+gate_g6_no_hash = copy.deepcopy(base_gate)
+gate_g6_no_hash["gate_id"] = "G6"
+gate_g6_no_hash["subject_hash"] = None
+expect_schema_invalid(gate_schema, gate_g6_no_hash, "gate-g6-no-subject-hash", negative)
+
 approval_no_decision = copy.deepcopy(base_approval)
 approval_no_decision["status"] = "APPROVED"
 approval_no_decision["decided_by"] = None
 expect_schema_invalid(approval_schema, approval_no_decision, "approval-approved-no-decider", negative)
+
+approval_g6_no_hash = copy.deepcopy(base_approval)
+approval_g6_no_hash["type"] = "gate"
+approval_g6_no_hash["gate"] = "G6"
+approval_g6_no_hash.pop("subject_hash", None)
+expect_schema_invalid(approval_schema, approval_g6_no_hash, "approval-g6-no-subject-hash", negative)
 
 approval_bad_status = copy.deepcopy(base_approval)
 approval_bad_status["status"] = "MAYBE"
@@ -277,6 +289,11 @@ def workflow_graph_errors(wf):
             errs.append(f"{nid}: tool node missing tool")
         if ntype == "subworkflow" and not node.get("workflow_ref"):
             errs.append(f"{nid}: subworkflow missing workflow_ref")
+        if ntype == "subworkflow" and node.get("workflow_ref"):
+            if node.get("workflow_ref") not in WORKFLOW_IDS:
+                errs.append(f"{nid}: unknown workflow_ref {node.get('workflow_ref')}")
+            if node.get("workflow_ref") == wf.get("id"):
+                errs.append(f"{nid}: recursive workflow_ref")
         if ntype == "gate" and not (node.get("gate") or node.get("gates")):
             errs.append(f"{nid}: gate node missing gate/gates")
         if ntype == "approval" and not node.get("approval"):
@@ -383,6 +400,18 @@ if workflow_graph_errors(bad):
     graph_negative += 1
 else:
     check(False, "graph negative 'skill missing' should fail")
+# Unknown subworkflow reference.
+composed = next((load_yaml(p) for p in workflow_files if load_yaml(p).get("id") == "release-composed"), None)
+if composed:
+    bad = copy.deepcopy(composed)
+    for node in bad["nodes"]:
+        if node.get("type") == "subworkflow":
+            node["workflow_ref"] = "missing-workflow"
+            break
+    if workflow_graph_errors(bad):
+        graph_negative += 1
+    else:
+        check(False, "graph negative 'unknown subworkflow' should fail")
 
 # ---------------------------------------------------------------------------
 # 4. State machines
@@ -716,6 +745,9 @@ check(retry_decision("agent_unavailable", 1, 3) == "retry", "failure: agent unav
 failure_cases += 1
 check(retry_decision("retryable", 1, 3, reversible=False) == "no_retry",
       "failure: irreversible operation must not auto-retry")
+failure_cases += 1
+check(retry_decision("retryable", 1, 3, idempotent=False) == "no_retry",
+      "failure: non-idempotent operation must not auto-retry")
 failure_cases += 1
 check(retry_decision("retryable", 3, 3) == "exhausted", "failure: retry budget should exhaust")
 failure_cases += 1

@@ -1,0 +1,27 @@
+schema_version: 1
+id: release-composed
+version: "0.1.0"
+name: 组合发布（示例）
+description: 演示通过 subworkflow 组合功能开发与生产部署；子 Workflow 的门禁不得被移除。
+status: draft
+trigger:
+  task_types: [feature_development, deployment_task]
+  complexity: [L3]
+  risk_levels: [high, critical]
+  environments: [prod]
+  change_types: [code, deployment]
+policies:
+  max_concurrency: 3
+  failure_policy: fail_workflow
+  evidence_level: strict
+nodes:
+  - id: feature
+    type: subworkflow
+    workflow_ref: feature-development
+  - id: deploy
+    type: subworkflow
+    workflow_ref: deployment
+    depends_on: [feature]
+  - id: end
+    type: end
+    depends_on: [deploy]

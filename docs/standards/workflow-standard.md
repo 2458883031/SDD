@@ -252,6 +252,7 @@ Workflow 由 Orchestrator 解释和执行；节点通过 `depends_on` 组织 DAG
 - 组合深度 ≤3；禁止递归和循环。
 - 子 Workflow 的输入/输出必须映射到父 Workflow 的 Artifact 引用。
 - 组合后的 Workflow 仍需通过自身 DAG 校验。
+- 示例：`release-composed` 通过 `subworkflow` 组合 `feature-development` 与 `deployment`，文件为 `examples/orchestration/workflows/release-composed.yaml`。
 
 ### 6.4 条件分支
 
@@ -333,6 +334,7 @@ Workflow 由 Orchestrator 解释和执行；节点通过 `depends_on` 组织 DAG
 
 - 与质量门禁/关键路径相关的分支失败 → 整个 Workflow 不得成功；按失败路径回退。
 - 独立且无副作用的分支可允许完成，但必须记录部分结果；不得把部分成功标记为整体成功。
+- `PARTIAL` 只是聚合结果/证据标记，不是 Workflow 状态；Workflow 仍须按必需 Task 和 Gate 判定 SUCCEEDED/FAILED。
 - 有副作用的分支失败 → 执行补偿/回滚；不可逆操作不得自动重试。
 - 取消时向所有运行中分支传播取消；保留已完成产物和证据。
 
