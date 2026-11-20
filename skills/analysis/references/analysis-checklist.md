@@ -5,7 +5,7 @@
 - [ ] `requirements_ref` 存在且 type=requirements；Requirements 内容通过 R1 Schema；
 - [ ] 上游 Requirements 没有 blocking 未决项/未解决冲突，或已返回 `needs_input`/`blocked`；
 - [ ] 所有含 `data.analysis` 的状态，`source_requirements_ref` 与输入 `requirements_ref` 完全一致；
-- [ ] `requirements_traceability` 覆盖 FR/NFR/constraints/dependencies/assumptions/unknowns/open_questions/acceptance_criteria/non_goals/source_refs；`analyzed`/`mapped` 有可解析 refs，`retained` 闭环到实际输出（AC 使用 `AC-<id>: <非空 consideration>`），`resolved` 只用 facts/candidate/risk 中的 evidence_refs，且引用完整匹配裸 `[a-f0-9]{64}` 或 `path@version#[a-f0-9]{64}`；SHA 小写、恰好一个且在末尾；多摘要/缺失/重复/额外前后缀/大小写混用/`path#sha256` 均拒绝；Requirements/source_refs/纯 path/陈述/假设和相同规范 SHA 换 path 均不得作为解决证据；不适用/延后有理由；
+- [ ] `requirements_traceability` 覆盖 FR/NFR/constraints/dependencies/assumptions/unknowns/open_questions/acceptance_criteria/non_goals/source_refs；`analyzed`/`mapped` 有可解析 refs，`retained` 闭环到实际输出（AC 使用 `AC-<id>: <非空 consideration>`），`resolved` 只用 facts/candidate/risk 中的 evidence_refs，且引用完整匹配裸 `^[a-f0-9]{64}(?![\s\S])` 或版本化 `^(?!.*(?:^|/)\.\.?(?:/|@))(?!(?:.*[a-f0-9]{64}){2})(?:[A-Za-z0-9._-]+/)*[A-Za-z0-9._-]+@(?:0|[1-9][0-9]*)#[a-f0-9]{64}(?![\s\S])`；SHA 小写、恰好一个且在绝对末尾；路径无 `//`、前导/尾随 `/`、`.`/`..` 段或额外 `@`/`#`；版本无前导零；多摘要/缺失/重复/额外前后缀/换行/空白/大小写混用/`path#sha256` 均拒绝；Requirements/source_refs/纯 path/陈述/假设和相同规范 SHA 换 path 均不得作为解决证据；不适用/延后有理由；
 - [ ] `status=ok` 至少包含一个 type=analysis 的 Artifact；不得用 source_refs 替代 artifacts；
 - [ ] Problem Statement 覆盖问题、目标、范围、非目标、约束、已知条件；
 - [ ] Technical Context 覆盖技术栈、结构、外部系统、依赖、数据/运行环境、限制、unknown；

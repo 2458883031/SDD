@@ -138,22 +138,26 @@ def analysis_ref_exists(ref, analysis, candidate_ids, risk_ids, design_considera
     return ref in candidate_ids or ref in risk_ids or ref in design_considerations
 
 
-BARE_SHA_RE = re.compile(r"^[a-f0-9]{64}$")
-VERSIONED_SHA_RE = re.compile(r"^.+@[0-9]+#[a-f0-9]{64}$")
-HEX64_RE = re.compile(r"[a-f0-9]{64}")
+BARE_SHA_RE = re.compile(r"[a-f0-9]{64}")
+VERSIONED_REF_RE = re.compile(
+    r"(?!.*(?:^|/)\.\.?(?:/|@))"
+    r"(?!(?:.*[a-f0-9]{64}){2})"
+    r"(?:[A-Za-z0-9._-]+/)*[A-Za-z0-9._-]+"
+    r"@(?:0|[1-9][0-9]*)"
+    r"#(?P<sha>[a-f0-9]{64})"
+)
 
 
 def artifact_sha(ref):
-    """Return SHA-256 only for canonical bare or path@version#sha references."""
+    """Return SHA-256 only for a full canonical bare or path@version#sha reference."""
     if not isinstance(ref, str):
         return None
     if BARE_SHA_RE.fullmatch(ref):
         return ref
-    if VERSIONED_SHA_RE.fullmatch(ref):
-        # Exactly one 64-hex digest may appear anywhere in the reference.
-        if len(HEX64_RE.findall(ref)) != 1:
-            return None
-        return ref.rsplit("#", 1)[1]
+    match = VERSIONED_REF_RE.fullmatch(ref)
+    if match:
+        # The full structure was validated before extracting the terminal digest.
+        return match.group("sha")
     return None
 
 
@@ -466,6 +470,8 @@ for name, schema in (("input", input_schema), ("output", output_schema)):
 in_validator = Draft202012Validator(input_schema)
 out_validator = Draft202012Validator(output_schema)
 req_validator = Draft202012Validator(req_output_schema)
+ref_item_schema = output_schema["$defs"]["traceItem"]["properties"]["resolution_evidence_refs"]["items"]
+ref_validator = Draft202012Validator(ref_item_schema)
 
 # 2. Examples
 input_files = sorted((SKILL / "examples").glob("example-input*.json"))
@@ -864,6 +870,102 @@ expect_resolved_failure(
     "docs/copies/requirements-copy.md@1#" + "A" * 32 + "b" * 32,
 )
 
+# F7: strict reference grammar, shared Schema/parser vectors, and fail-closed checks.
+ind_sha = "b" * 64
+f7_valid_ref = "docs/evidence.md@1#" + ind_sha
+f7_required_negatives = (
+    ("resolved-extra-hash-in-path", "docs/evidence.md#extra@1#" + ind_sha),
+    ("resolved-extra-at-sign", "docs/evidence@extra.md@1#" + ind_sha),
+    ("resolved-empty-path", "@1#" + ind_sha),
+    ("resolved-path-trailing-slash", "docs/evidence/@1#" + ind_sha),
+    ("resolved-version-leading-zero", "docs/evidence.md@01#" + ind_sha),
+    ("resolved-valid-ref-with-LF", f7_valid_ref + "\n"),
+    ("resolved-valid-ref-with-CR", f7_valid_ref + "\r"),
+    ("resolved-valid-ref-with-space", f7_valid_ref + " "),
+    ("resolved-valid-ref-with-Tab", f7_valid_ref + "\t"),
+    ("resolved-extra-char-before-sha", "docs/evidence.md@1#x" + ind_sha),
+    ("resolved-extra-char-after-sha", f7_valid_ref + "x"),
+    ("resolved-second-digest-in-path", "a" * 64 + "/docs/evidence.md@1#" + ind_sha),
+)
+f7_additional_negatives = (
+    ("resolved-leading-slash-path", "/docs/evidence.md@1#" + ind_sha),
+    ("resolved-double-slash-path", "docs//evidence.md@1#" + ind_sha),
+    ("resolved-dot-segment", "docs/./evidence.md@1#" + ind_sha),
+    ("resolved-dotdot-segment", "docs/../evidence.md@1#" + ind_sha),
+)
+f7_negative_cases = 0
+f7_negative_passed = 0
+for label, ref in f7_required_negatives + f7_additional_negatives:
+    expect_resolved_failure(label, ref)
+    schema_ok = ref_validator.is_valid(ref)
+    parser_sha = artifact_sha(ref)
+    evidence_ok = resolved_evidence_exists(
+        ref, resolved_with_evidence("facts", ref)["data"]["analysis"]
+    )
+    identity_ok = is_requirements_ref(ref, base["data"]["analysis"])
+    check(not schema_ok, f"{label}: Schema must reject non-canonical ref")
+    check(parser_sha is None, f"{label}: artifact_sha must return None")
+    check(not evidence_ok, f"{label}: resolved_evidence_exists must fail closed")
+    check(not identity_ok, f"{label}: non-canonical ref must not match Requirements identity")
+    f7_negative_cases += 1
+    if not schema_ok and parser_sha is None and not evidence_ok and not identity_ok:
+        f7_negative_passed += 1
+
+f7_vectors = (
+    ("bare-sha", ind_sha, True),
+    ("versioned-simple", f7_valid_ref, True),
+    ("versioned-zero", "docs/evidence/facts.md@0#" + ind_sha, True),
+    ("versioned-multi-segment", "a/b_c-d.e/f@12#" + ind_sha, True),
+    ("versioned-hidden-file", "docs/.evidence@1#" + ind_sha, True),
+    ("extra-hash-in-path", "docs/evidence.md#extra@1#" + ind_sha, False),
+    ("extra-at-in-path", "docs/evidence@extra.md@1#" + ind_sha, False),
+    ("empty-path", "@1#" + ind_sha, False),
+    ("leading-slash-path", "/docs/evidence.md@1#" + ind_sha, False),
+    ("trailing-slash-path", "docs/evidence/@1#" + ind_sha, False),
+    ("double-slash-path", "docs//evidence.md@1#" + ind_sha, False),
+    ("dot-segment", "docs/./evidence.md@1#" + ind_sha, False),
+    ("dotdot-segment", "docs/../evidence.md@1#" + ind_sha, False),
+    ("dot-terminal-segment", "docs/.@1#" + ind_sha, False),
+    ("dotdot-terminal-segment", "docs/..@1#" + ind_sha, False),
+    ("leading-zero-version", "docs/evidence.md@01#" + ind_sha, False),
+    ("empty-version", "docs/evidence.md@#" + ind_sha, False),
+    ("signed-version", "docs/evidence.md@+1#" + ind_sha, False),
+    ("missing-at-version", "docs/evidence.md#" + ind_sha, False),
+    ("trailing-LF", f7_valid_ref + "\n", False),
+    ("trailing-CR", f7_valid_ref + "\r", False),
+    ("trailing-space", f7_valid_ref + " ", False),
+    ("trailing-Tab", f7_valid_ref + "\t", False),
+    ("extra-before-sha", "docs/evidence.md@1#x" + ind_sha, False),
+    ("extra-after-sha", f7_valid_ref + "x", False),
+    ("second-digest-in-path", "a" * 64 + "/docs/evidence.md@1#" + ind_sha, False),
+    ("missing-sha", "docs/evidence.md@1#", False),
+    ("uppercase-sha", "docs/evidence.md@1#" + ind_sha.upper(), False),
+    ("mixed-case-sha", "docs/evidence.md@1#" + "A" * 32 + "b" * 32, False),
+    ("non-string", None, False),
+)
+f7_vector_count = len(f7_vectors)
+f7_vector_passed = 0
+for label, ref, expected in f7_vectors:
+    schema_ok = ref_validator.is_valid(ref)
+    parser_ok = artifact_sha(ref) is not None
+    check(schema_ok == expected, f"F7 vector {label}: Schema expected {expected}, got {schema_ok}")
+    check(parser_ok == expected, f"F7 vector {label}: parser expected {expected}, got {parser_ok}")
+    check(schema_ok == parser_ok, f"F7 vector {label}: Schema/parser disagree")
+    if schema_ok == parser_ok == expected:
+        f7_vector_passed += 1
+
+f7_identity_positive = 0
+for label, ref in (
+    ("requirements-path", req_path),
+    ("requirements-ref-key", ref_key(req_ref)),
+    ("requirements-bare-sha", req_sha),
+    ("requirements-same-sha-different-path", "other/path/requirements-copy.md@7#" + req_sha),
+):
+    ok = is_requirements_ref(ref, base["data"]["analysis"])
+    check(ok, f"F7 identity {label}: expected Requirements identity match")
+    if ok:
+        f7_identity_positive += 1
+
 multi_sha_alias = "a" * 64 + "/docs/copies/requirements-copy.md@1#" + req_sha
 for label, kind in (
     ("resolved-multi-sha-alias-in-facts", "facts"),
@@ -1009,5 +1111,7 @@ print(f"schema_negative={schema_negative[0]} semantic_negative={semantic_negativ
 print(f"f1_negative={f1_negative_cases} f1_positive={f1_positive_cases} f2_cases={f2_cases} f3_cases={f3_cases}")
 print(f"trace_negative={trace_negative_cases} trace_positive={trace_positive_cases}")
 print(f"resolved_negative={resolved_negative_cases} resolved_positive={resolved_positive_cases}")
+print(f"f7_negative={f7_negative_cases} f7_negative_passed={f7_negative_passed}")
+print(f"f7_vectors={f7_vector_count} f7_vectors_passed={f7_vector_passed} f7_identity_positive={f7_identity_positive}")
 print(f"acceptance_retained_negative={acceptance_negative_cases} acceptance_retained_positive={acceptance_positive_cases}")
 print("runtime_behavior=NOT_EXECUTED")
