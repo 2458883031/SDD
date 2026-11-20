@@ -493,6 +493,7 @@ builder_check:
 | Task/Workflow/Node/Gate/Approval 状态与转换 | [orchestration-state-machine.md](../standards/orchestration-state-machine.md) |
 | G1–G6 在编排中的挂载、质量门禁和 G4/G5 绑定 | [gate-orchestration-standard.md](../standards/gate-orchestration-standard.md) |
 | Approval 对象、生命周期、绑定、过期和失效 | [approval-orchestration-standard.md](../standards/approval-orchestration-standard.md) |
+| 失败分类、重试、补偿与恢复 | [failure-recovery-standard.md](../standards/failure-recovery-standard.md) |
 | 上下文分层、Evidence、日志/事件/审计、观测指标 | [execution-evidence-standard.md](../standards/execution-evidence-standard.md) |
 | Workflow/Task/Gate/Approval/Evidence Schema | `schemas/orchestration/` |
 | 可验证示例 | `examples/orchestration/` |
