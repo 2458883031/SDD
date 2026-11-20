@@ -1,0 +1,143 @@
+{
+  "status": "ok",
+  "data": {
+    "requirements": {
+      "goal": "为订单列表增加按状态、时间和金额范围筛选的能力",
+      "scope": [
+        "订单列表页增加筛选面板",
+        "筛选条件与查询接口联动",
+        "筛选条件可组合使用"
+      ],
+      "constraints": [
+        "状态值使用现有订单状态枚举",
+        "不修改订单数据模型"
+      ],
+      "non_goals": [
+        "不增加新的订单状态",
+        "不修改订单创建和支付流程"
+      ],
+      "functional_requirements": [
+        {
+          "id": "FR-1",
+          "statement": "用户可以按一个或多个订单状态筛选列表",
+          "priority": "must",
+          "source_type": "user_stated"
+        },
+        {
+          "id": "FR-2",
+          "statement": "用户可以按创建时间范围筛选列表",
+          "priority": "should",
+          "source_type": "user_stated"
+        },
+        {
+          "id": "FR-3",
+          "statement": "筛选结果必须与查询接口返回一致",
+          "priority": "must",
+          "source_type": "evidence_backed",
+          "evidence_refs": ["docs/standards/requirements-standard.md"]
+        }
+      ],
+      "non_functional_requirements": [
+        {
+          "id": "NFR-1",
+          "category": "performance",
+          "statement": "筛选请求在常见数据量下保持可用响应时间",
+          "measurable_target": "p95 < 500ms（10 万订单测试集）",
+          "source_type": "user_stated"
+        },
+        {
+          "id": "NFR-2",
+          "category": "security",
+          "statement": "筛选只能访问当前用户有权查看的订单",
+          "measurable_target": "越权订单返回 403 或不出现在结果中",
+          "source_type": "evidence_backed",
+          "evidence_refs": ["docs/architecture/security-architecture.md"]
+        }
+      ],
+      "dependencies": [
+        {
+          "id": "DEP-1",
+          "name": "订单查询接口",
+          "type": "service",
+          "description": "筛选依赖现有订单查询接口支持过滤参数",
+          "source_refs": ["docs/architecture/module-architecture.md"]
+        }
+      ],
+      "assumptions": [
+        {
+          "id": "ASM-1",
+          "statement": "现有订单状态枚举足够支持业务筛选",
+          "basis": "订单模型已有状态字段；未与用户逐项确认",
+          "risk_if_wrong": "需要新增状态或映射，影响查询接口和前端展示",
+          "status": "unconfirmed"
+        }
+      ],
+      "unknowns": [
+        {
+          "id": "UNK-1",
+          "description": "是否需要支持保存筛选条件",
+          "impact": "影响前端状态管理和接口设计",
+          "blocking": false
+        }
+      ],
+      "open_questions": [
+        {
+          "id": "Q-1",
+          "question": "金额范围筛选是否包含边界值？",
+          "blocking": false,
+          "related_ids": ["FR-2"]
+        }
+      ],
+      "ambiguities": [
+        {
+          "id": "AMB-1",
+          "description": "“常见数据量”尚无明确上限",
+          "status": "resolved",
+          "related_ids": ["NFR-1"]
+        }
+      ],
+      "conflicts": [
+        {
+          "id": "CON-1",
+          "description": "旧版需求只允许单状态筛选",
+          "status": "resolved",
+          "related_ids": ["FR-1"]
+        }
+      ],
+      "acceptance_criteria": [
+        {
+          "id": "AC-1",
+          "criterion": "选择多个状态后，列表只显示所选状态的订单",
+          "verification": "接口测试和 UI 验收",
+          "related_requirement_ids": ["FR-1"]
+        },
+        {
+          "id": "AC-2",
+          "criterion": "清空筛选后恢复显示全部有权限的订单",
+          "verification": "UI 验收",
+          "related_requirement_ids": ["FR-1"]
+        }
+      ],
+      "source_refs": [
+        {
+          "path": "artifacts/task-20261120-req0001/requirements/previous-requirements.md",
+          "version": 1,
+          "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "type": "requirements"
+        }
+      ],
+      "requirements_version": "0.2.0"
+    },
+    "questions": []
+  },
+  "artifacts": [
+    {
+      "path": "artifacts/task-20261120-req0001/requirements/requirements.md",
+      "version": 1,
+      "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "type": "requirements"
+    }
+  ],
+  "errors": [],
+  "evidence": []
+}

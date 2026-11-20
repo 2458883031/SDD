@@ -14,3 +14,29 @@ invalid_cases:
       request: "有效需求"
       unexpected_field: true
     expect_schema_error: true
+  - name: bad-existing-requirement-ref
+    input:
+      request: "基于已有需求修改"
+      existing_requirements:
+        - path: artifacts/task-20261120-req0001/requirements/requirements.md
+          version: 1
+          type: requirements
+    expect_schema_error: true
+  - name: change-request-missing-changes
+    input:
+      request: "修改需求"
+      change_request:
+        reason: "用户要求调整"
+    expect_schema_error: true
+  - name: change-request-bad-previous-ref
+    input:
+      request: "修改需求"
+      change_request:
+        reason: "用户要求调整"
+        requested_changes: ["调整范围"]
+        previous_requirements:
+          - path: artifacts/task-20261120-req0001/requirements/requirements.md
+            version: 1
+            sha256: not-a-sha
+            type: requirements
+    expect_schema_error: true

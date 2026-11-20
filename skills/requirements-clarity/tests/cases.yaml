@@ -1,5 +1,5 @@
 skill: requirements-clarity
-version: 0.1.0
+version: 0.2.0
 cases:
   - name: clear-feature-request
     input:
@@ -9,6 +9,35 @@ cases:
       status: ok
       output_example: examples/example-output.json
       required_output_fields: [goal, scope, constraints, acceptance_criteria, non_goals]
+  - name: structured-feature-request
+    input:
+      request: "为订单列表增加按状态、时间和金额范围筛选"
+      constraints: ["复用现有订单状态枚举"]
+    expect:
+      status: ok
+      output_example: examples/example-output-structured.json
+      required_output_fields: [functional_requirements, non_functional_requirements, dependencies, assumptions, unknowns, open_questions, acceptance_criteria, source_refs]
+  - name: requirement-change
+    input:
+      request: "在现有订单筛选基础上增加金额范围筛选"
+      constraints: ["复用现有订单状态枚举"]
+      existing_requirements:
+        - path: artifacts/task-20261120-req0002/requirements/requirements-v1.md
+          version: 1
+          sha256: cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+          type: requirements
+      change_request:
+        reason: "用户要求增加金额范围筛选"
+        requested_changes: ["增加金额范围筛选条件", "更新验收标准"]
+        previous_requirements:
+          - path: artifacts/task-20261120-req0002/requirements/requirements-v1.md
+            version: 1
+            sha256: cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+            type: requirements
+    expect:
+      status: ok
+      output_example: examples/example-output-change.json
+      required_output_fields: [change_impact, requirements_version]
   - name: missing-acceptance-criteria
     input:
       request: "优化一下系统"

@@ -1,0 +1,24 @@
+{
+  "request": "在现有订单筛选基础上增加金额范围筛选",
+  "constraints": ["复用现有订单状态枚举"],
+  "existing_requirements": [
+    {
+      "path": "artifacts/task-20261120-req0002/requirements/requirements-v1.md",
+      "version": 1,
+      "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "type": "requirements"
+    }
+  ],
+  "change_request": {
+    "reason": "用户要求增加金额范围筛选",
+    "requested_changes": ["增加金额范围筛选条件", "更新验收标准"],
+    "previous_requirements": [
+      {
+        "path": "artifacts/task-20261120-req0002/requirements/requirements-v1.md",
+        "version": 1,
+        "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "type": "requirements"
+      }
+    ]
+  }
+}

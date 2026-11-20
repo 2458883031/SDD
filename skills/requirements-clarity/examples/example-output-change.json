@@ -1,0 +1,73 @@
+{
+  "status": "ok",
+  "data": {
+    "requirements": {
+      "goal": "允许用户按订单状态、时间和金额范围筛选订单列表",
+      "scope": ["订单列表筛选"],
+      "constraints": ["复用现有订单状态枚举"],
+      "non_goals": ["不修改订单数据模型"],
+      "functional_requirements": [
+        {
+          "id": "FR-1",
+          "statement": "用户可以组合状态、时间和金额范围筛选订单",
+          "priority": "must",
+          "source_type": "user_stated"
+        }
+      ],
+      "non_functional_requirements": [
+        {
+          "id": "NFR-1",
+          "category": "performance",
+          "statement": "筛选查询保持可接受响应时间",
+          "measurable_target": "p95 < 500ms",
+          "source_type": "user_stated"
+        }
+      ],
+      "acceptance_criteria": [
+        {
+          "id": "AC-1",
+          "criterion": "组合筛选结果与查询接口一致",
+          "verification": "接口契约测试",
+          "related_requirement_ids": ["FR-1"]
+        }
+      ],
+      "source_refs": [
+        {
+          "path": "artifacts/task-20261120-req0002/requirements/requirements-v1.md",
+          "version": 1,
+          "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "type": "requirements"
+        }
+      ],
+      "change_impact": {
+        "previous_ref": {
+          "path": "artifacts/task-20261120-req0002/requirements/requirements-v1.md",
+          "version": 1,
+          "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "type": "requirements"
+        },
+        "change_reason": "用户要求增加金额范围筛选",
+        "changed_items": ["FR-1", "AC-1"],
+        "affected_requirement_ids": ["FR-1", "AC-1"],
+        "downstream_impact": {
+          "analysis": true,
+          "design": true,
+          "plan": true
+        },
+        "gate_invalidation": ["G1", "G2", "G3"]
+      },
+      "requirements_version": "0.2.1"
+    },
+    "questions": []
+  },
+  "artifacts": [
+    {
+      "path": "artifacts/task-20261120-req0002/requirements/requirements-v2.md",
+      "version": 2,
+      "sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "type": "requirements"
+    }
+  ],
+  "errors": [],
+  "evidence": []
+}

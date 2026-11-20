@@ -13,7 +13,7 @@
     "data": { "type": "object" },
     "artifacts": {
       "type": "array",
-      "items": { "$ref": "#/$defs/artifact" }
+      "items": { "$ref": "#/$defs/artifactRef" }
     },
     "errors": {
       "type": "array",
@@ -64,7 +64,7 @@
     }
   ],
   "$defs": {
-    "artifact": {
+    "artifactRef": {
       "type": "object",
       "additionalProperties": false,
       "required": ["path", "version", "sha256", "type"],
@@ -72,7 +72,10 @@
         "path": { "type": "string", "minLength": 1 },
         "version": { "type": "integer", "minimum": 1 },
         "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
-        "type": { "type": "string", "minLength": 1 }
+        "type": {
+          "type": "string",
+          "enum": ["requirements", "analysis", "design", "plan", "report", "other"]
+        }
       }
     },
     "error": {
@@ -98,6 +101,168 @@
         "note": { "type": "string" }
       }
     },
+    "functionalRequirement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "statement", "priority", "source_type"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^FR-[0-9]+$" },
+        "statement": { "type": "string", "minLength": 1 },
+        "priority": { "type": "string", "enum": ["must", "should", "could"] },
+        "source_type": { "type": "string", "enum": ["user_stated", "evidence_backed"] },
+        "evidence_refs": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "notes": { "type": "string" }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "source_type": { "const": "evidence_backed" } }, "required": ["source_type"] },
+          "then": {
+            "properties": { "evidence_refs": { "minItems": 1 } },
+            "required": ["evidence_refs"]
+          }
+        }
+      ]
+    },
+    "nonFunctionalRequirement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "category", "statement", "measurable_target", "source_type"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^NFR-[0-9]+$" },
+        "category": {
+          "type": "string",
+          "enum": ["performance", "reliability", "security", "usability", "compatibility", "maintainability", "observability", "other"]
+        },
+        "statement": { "type": "string", "minLength": 1 },
+        "measurable_target": { "type": "string", "minLength": 1 },
+        "source_type": { "type": "string", "enum": ["user_stated", "evidence_backed"] },
+        "evidence_refs": { "type": "array", "items": { "type": "string", "minLength": 1 } }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "source_type": { "const": "evidence_backed" } }, "required": ["source_type"] },
+          "then": {
+            "properties": { "evidence_refs": { "minItems": 1 } },
+            "required": ["evidence_refs"]
+          }
+        }
+      ]
+    },
+    "dependency": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name", "type"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^DEP-[0-9]+$" },
+        "name": { "type": "string", "minLength": 1 },
+        "type": { "type": "string", "enum": ["technical", "business", "external", "service", "data", "other"] },
+        "description": { "type": "string" },
+        "source_refs": { "type": "array", "items": { "type": "string", "minLength": 1 } }
+      }
+    },
+    "assumption": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "statement", "basis", "status"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^ASM-[0-9]+$" },
+        "statement": { "type": "string", "minLength": 1 },
+        "basis": { "type": "string", "minLength": 1 },
+        "risk_if_wrong": { "type": "string" },
+        "status": { "type": "string", "enum": ["unconfirmed"] }
+      }
+    },
+    "unknownItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "description", "blocking"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^UNK-[0-9]+$" },
+        "description": { "type": "string", "minLength": 1 },
+        "impact": { "type": "string" },
+        "blocking": { "type": "boolean" }
+      }
+    },
+    "openQuestion": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "question", "blocking"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^Q-[0-9]+$" },
+        "question": { "type": "string", "minLength": 1 },
+        "blocking": { "type": "boolean" },
+        "related_ids": { "type": "array", "items": { "type": "string", "minLength": 1 } }
+      }
+    },
+    "ambiguity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "description", "status"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^AMB-[0-9]+$" },
+        "description": { "type": "string", "minLength": 1 },
+        "status": { "type": "string", "enum": ["open", "resolved"] },
+        "related_ids": { "type": "array", "items": { "type": "string", "minLength": 1 } }
+      }
+    },
+    "conflict": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "description", "status"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^CON-[0-9]+$" },
+        "description": { "type": "string", "minLength": 1 },
+        "status": { "type": "string", "enum": ["open", "resolved", "accepted_risk"] },
+        "related_ids": { "type": "array", "items": { "type": "string", "minLength": 1 } }
+      }
+    },
+    "acceptanceCriterion": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "criterion", "verification"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^AC-[0-9]+$" },
+        "criterion": { "type": "string", "minLength": 1 },
+        "verification": { "type": "string", "minLength": 1 },
+        "related_requirement_ids": { "type": "array", "items": { "type": "string", "minLength": 1 } }
+      }
+    },
+    "changeImpact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["previous_ref", "change_reason", "changed_items", "downstream_impact", "gate_invalidation"],
+      "properties": {
+        "previous_ref": { "$ref": "#/$defs/artifactRef" },
+        "change_reason": { "type": "string", "minLength": 1 },
+        "changed_items": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } },
+        "affected_requirement_ids": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "downstream_impact": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["analysis", "design", "plan"],
+          "properties": {
+            "analysis": { "type": "boolean" },
+            "design": { "type": "boolean" },
+            "plan": { "type": "boolean" }
+          }
+        },
+        "gate_invalidation": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string", "enum": ["G1", "G2", "G3"] }
+        }
+      }
+    },
+    "acceptanceCriteria": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "oneOf": [
+          { "type": "string", "minLength": 1 },
+          { "$ref": "#/$defs/acceptanceCriterion" }
+        ]
+      }
+    },
     "requirementsFull": {
       "type": "object",
       "additionalProperties": false,
@@ -106,12 +271,22 @@
         "goal": { "type": "string", "minLength": 1 },
         "scope": { "type": "array", "items": { "type": "string", "minLength": 1 } },
         "constraints": { "type": "array", "items": { "type": "string", "minLength": 1 } },
-        "acceptance_criteria": {
-          "type": "array",
-          "minItems": 1,
-          "items": { "type": "string", "minLength": 1 }
-        },
-        "non_goals": { "type": "array", "items": { "type": "string", "minLength": 1 } }
+        "acceptance_criteria": { "$ref": "#/$defs/acceptanceCriteria" },
+        "non_goals": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "functional_requirements": { "type": "array", "items": { "$ref": "#/$defs/functionalRequirement" } },
+        "non_functional_requirements": { "type": "array", "items": { "$ref": "#/$defs/nonFunctionalRequirement" } },
+        "dependencies": { "type": "array", "items": { "$ref": "#/$defs/dependency" } },
+        "assumptions": { "type": "array", "items": { "$ref": "#/$defs/assumption" } },
+        "unknowns": { "type": "array", "items": { "$ref": "#/$defs/unknownItem" } },
+        "open_questions": { "type": "array", "items": { "$ref": "#/$defs/openQuestion" } },
+        "ambiguities": { "type": "array", "items": { "$ref": "#/$defs/ambiguity" } },
+        "conflicts": { "type": "array", "items": { "$ref": "#/$defs/conflict" } },
+        "source_refs": { "type": "array", "items": { "$ref": "#/$defs/artifactRef" } },
+        "change_impact": { "$ref": "#/$defs/changeImpact" },
+        "requirements_version": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(?:-[0-9A-Za-z.-]+)?(?:\\+[0-9A-Za-z.-]+)?$"
+        }
       }
     },
     "requirementsPartial": {
@@ -121,12 +296,22 @@
         "goal": { "type": "string", "minLength": 1 },
         "scope": { "type": "array", "items": { "type": "string", "minLength": 1 } },
         "constraints": { "type": "array", "items": { "type": "string", "minLength": 1 } },
-        "acceptance_criteria": {
-          "type": "array",
-          "minItems": 1,
-          "items": { "type": "string", "minLength": 1 }
-        },
-        "non_goals": { "type": "array", "items": { "type": "string", "minLength": 1 } }
+        "acceptance_criteria": { "$ref": "#/$defs/acceptanceCriteria" },
+        "non_goals": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "functional_requirements": { "type": "array", "items": { "$ref": "#/$defs/functionalRequirement" } },
+        "non_functional_requirements": { "type": "array", "items": { "$ref": "#/$defs/nonFunctionalRequirement" } },
+        "dependencies": { "type": "array", "items": { "$ref": "#/$defs/dependency" } },
+        "assumptions": { "type": "array", "items": { "$ref": "#/$defs/assumption" } },
+        "unknowns": { "type": "array", "items": { "$ref": "#/$defs/unknownItem" } },
+        "open_questions": { "type": "array", "items": { "$ref": "#/$defs/openQuestion" } },
+        "ambiguities": { "type": "array", "items": { "$ref": "#/$defs/ambiguity" } },
+        "conflicts": { "type": "array", "items": { "$ref": "#/$defs/conflict" } },
+        "source_refs": { "type": "array", "items": { "$ref": "#/$defs/artifactRef" } },
+        "change_impact": { "$ref": "#/$defs/changeImpact" },
+        "requirements_version": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(?:-[0-9A-Za-z.-]+)?(?:\\+[0-9A-Za-z.-]+)?$"
+        }
       }
     },
     "questions": {

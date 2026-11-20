@@ -94,6 +94,89 @@ def load_yaml(path):
         return yaml.load(f, Loader=UniqueKeyLoader)
 
 
+VAGUE_ACCEPTANCE_RE = re.compile(r"尽快|友好|高性能|尽可能|适当|良好|优秀|快速")
+
+
+def validate_requirements_output(obj, label):
+    """Semantic checks for Requirements output beyond JSON Schema."""
+    errs = []
+    if not isinstance(obj, dict):
+        return [f"{label}: output must be an object"]
+    data = obj.get("data")
+    if isinstance(data, dict):
+        for forbidden in ("confirmation_ref", "gate_approved", "confirmed_by"):
+            if forbidden in data:
+                errs.append(f"{label}: forbidden confirmation field {forbidden}")
+    req = data.get("requirements") if isinstance(data, dict) else None
+    if not isinstance(req, dict):
+        return errs
+    for forbidden in ("confirmation_ref", "gate_approved", "confirmed_by"):
+        if forbidden in req:
+            errs.append(f"{label}: forbidden confirmation field {forbidden} in requirements")
+
+    for fr in req.get("functional_requirements", []) or []:
+        if fr.get("source_type") == "evidence_backed" and not fr.get("evidence_refs"):
+            errs.append(f"{label}: evidence-backed FR {fr.get('id')} missing evidence_refs")
+    for nfr in req.get("non_functional_requirements", []) or []:
+        if nfr.get("source_type") == "evidence_backed" and not nfr.get("evidence_refs"):
+            errs.append(f"{label}: evidence-backed NFR {nfr.get('id')} missing evidence_refs")
+        target = nfr.get("measurable_target", "")
+        if isinstance(target, str) and VAGUE_ACCEPTANCE_RE.search(target):
+            errs.append(f"{label}: NFR {nfr.get('id')} has vague measurable_target")
+    for assumption in req.get("assumptions", []) or []:
+        if assumption.get("status") != "unconfirmed":
+            errs.append(f"{label}: assumption {assumption.get('id')} must remain unconfirmed")
+        if not assumption.get("basis"):
+            errs.append(f"{label}: assumption {assumption.get('id')} missing basis")
+
+    if obj.get("status") == "ok":
+        for item in req.get("unknowns", []) or []:
+            if item.get("blocking") is True:
+                errs.append(f"{label}: blocking unknown prevents status=ok")
+        for item in req.get("open_questions", []) or []:
+            if item.get("blocking") is True:
+                errs.append(f"{label}: blocking open question prevents status=ok")
+        for item in req.get("conflicts", []) or []:
+            if item.get("status") == "open":
+                errs.append(f"{label}: open conflict prevents status=ok")
+        for item in req.get("ambiguities", []) or []:
+            if item.get("status") == "open":
+                errs.append(f"{label}: open ambiguity prevents status=ok")
+
+    for criterion in req.get("acceptance_criteria", []) or []:
+        if isinstance(criterion, str):
+            text = criterion
+            verification = None
+        elif isinstance(criterion, dict):
+            text = criterion.get("criterion", "")
+            verification = criterion.get("verification")
+            if not verification:
+                errs.append(f"{label}: acceptance criterion {criterion.get('id')} missing verification")
+        else:
+            errs.append(f"{label}: acceptance criterion must be string or object")
+            continue
+        if not text:
+            errs.append(f"{label}: empty acceptance criterion")
+        elif VAGUE_ACCEPTANCE_RE.search(text):
+            errs.append(f"{label}: vague acceptance criterion {text!r}")
+
+    change = req.get("change_impact")
+    if isinstance(change, dict):
+        if not change.get("previous_ref"):
+            errs.append(f"{label}: change_impact missing previous_ref")
+        downstream = change.get("downstream_impact", {})
+        if isinstance(downstream, dict) and any(downstream.values()) and not change.get("gate_invalidation"):
+            errs.append(f"{label}: change_impact affects downstream but has no gate_invalidation")
+    return errs
+
+
+def expect_schema_invalid(validator, instance, label, counter):
+    errs = list(validator.iter_errors(instance))
+    check(bool(errs), f"{label}: expected schema rejection, got valid instance")
+    if errs:
+        counter[0] += 1
+
+
 def validate_metadata_doc(doc, label):
     """Return semantic errors for a platform metadata document.
 
@@ -178,6 +261,7 @@ check(set(meta.get("requires", {})) <= {"runtime", "tools", "permissions"}, "SKI
 manifest = load_yaml(SKILL / "skill.yaml")
 check(manifest.get("name") == "requirements-clarity", "skill.yaml: name mismatch")
 check(manifest.get("schema_version") == 1, "skill.yaml: schema_version must be 1")
+check(manifest.get("version") == "0.2.0", "skill.yaml: version must be 0.2.0")
 check(valid_semver(str(manifest.get("version", ""))), "skill.yaml: invalid SemVer")
 check(manifest.get("status") in {"draft", "review", "tested", "published", "deprecated", "retired", "archived"}, "skill.yaml: invalid status")
 check(manifest.get("compatibility", {}).get("requires_capabilities") == ["skill-discovery", "skill-metadata", "tool-invocation", "context-port", "artifact-port", "result-port"], "skill.yaml: capability registry mismatch")
@@ -204,15 +288,22 @@ for name, schema in (("input", input_schema), ("output", output_schema)):
 
 example_inputs = sorted((SKILL / "examples").glob("example-input*.json"))
 example_outputs = sorted((SKILL / "examples").glob("example-output*.json"))
+requirements_semantic_positive = 0
 for path in example_inputs:
     errs = list(in_validator.iter_errors(load_json(path)))
     check(not errs, f"{path.name}: input example invalid: {errs[:2]}")
 for path in example_outputs:
-    errs = list(out_validator.iter_errors(load_json(path)))
+    obj = load_json(path)
+    errs = list(out_validator.iter_errors(obj))
     check(not errs, f"{path.name}: output example invalid: {errs[:2]}")
+    sem_errs = validate_requirements_output(obj, path.name)
+    check(not sem_errs, f"{path.name}: semantic error: {sem_errs[:3]}")
+    if not errs and not sem_errs:
+        requirements_semantic_positive += 1
 
 cases = load_yaml(SKILL / "tests" / "cases.yaml")
 check(cases.get("skill") == "requirements-clarity", "tests: skill mismatch")
+check(cases.get("version") == "0.2.0", "tests: version must be 0.2.0")
 case_list = cases.get("cases", [])
 check(isinstance(case_list, list) and len(case_list) >= 6, "tests: need at least 6 cases")
 executed_cases = 0
@@ -233,6 +324,8 @@ for i, case in enumerate(case_list):
             out_obj = load_json(example_path)
             out_errs = list(out_validator.iter_errors(out_obj))
             check(not out_errs, f"tests[{name}]: output example invalid: {out_errs[:2]}")
+            sem_errs = validate_requirements_output(out_obj, f"tests[{name}]")
+            check(not sem_errs, f"tests[{name}]: output semantic error: {sem_errs[:3]}")
             check(out_obj.get("status") == status, f"tests[{name}]: output example status mismatch")
     executed_cases += 1
 
@@ -241,6 +334,105 @@ invalid_list = invalid.get("invalid_cases", [])
 for i, case in enumerate(invalid_list):
     errs = list(in_validator.iter_errors(case.get("input")))
     check(bool(errs), f"invalid-cases[{i}]: expected schema rejection, got valid input")
+
+# 2b. Requirements-specific negative tests
+structured_output = load_json(SKILL / "examples" / "example-output-structured.json")
+change_output = load_json(SKILL / "examples" / "example-output-change.json")
+negative_schema = [0]
+negative_semantic = [0]
+
+
+def expect_requirements_schema_invalid(label, mutate):
+    obj = copy.deepcopy(structured_output)
+    mutate(obj["data"]["requirements"])
+    expect_schema_invalid(out_validator, obj, label, negative_schema)
+
+
+def expect_requirements_semantic_failure(label, mutate):
+    obj = copy.deepcopy(structured_output)
+    mutate(obj["data"]["requirements"])
+    errs = validate_requirements_output(obj, label)
+    check(bool(errs), f"{label}: expected semantic failure, got pass")
+    if errs:
+        negative_semantic[0] += 1
+
+
+expect_requirements_schema_invalid(
+    "requirements-fr-missing-statement",
+    lambda req: req["functional_requirements"][0].pop("statement"))
+expect_requirements_schema_invalid(
+    "requirements-fr-evidence-without-refs",
+    lambda req: next(
+        (fr for fr in req["functional_requirements"] if fr["source_type"] == "evidence_backed")
+    ).update({"evidence_refs": []}))
+expect_requirements_schema_invalid(
+    "requirements-nfr-missing-target",
+    lambda req: req["non_functional_requirements"][0].pop("measurable_target"))
+expect_requirements_schema_invalid(
+    "requirements-assumption-missing-basis",
+    lambda req: req["assumptions"][0].pop("basis"))
+expect_requirements_schema_invalid(
+    "requirements-assumption-confirmed",
+    lambda req: req["assumptions"][0].update({"status": "confirmed"}))
+expect_requirements_schema_invalid(
+    "requirements-open-question-missing-blocking",
+    lambda req: req["open_questions"][0].pop("blocking"))
+expect_requirements_schema_invalid(
+    "requirements-dependency-missing-type",
+    lambda req: req["dependencies"][0].pop("type"))
+expect_requirements_schema_invalid(
+    "requirements-source-ref-bad-sha",
+    lambda req: req["source_refs"][0].update({"sha256": "not-a-sha"}))
+expect_requirements_schema_invalid(
+    "requirements-acceptance-missing-verification",
+    lambda req: req["acceptance_criteria"][0].pop("verification"))
+change_missing_previous = copy.deepcopy(change_output)
+change_missing_previous["data"]["requirements"]["change_impact"].pop("previous_ref", None)
+expect_schema_invalid(out_validator, change_missing_previous,
+                      "requirements-change-missing-previous-ref", negative_schema)
+expect_requirements_schema_invalid(
+    "requirements-confirmation-ref-forbidden",
+    lambda req: req.update({"confirmation_ref": "fake"}))
+expect_requirements_schema_invalid(
+    "requirements-unknown-field",
+    lambda req: req.update({"unexpected_field": True}))
+expect_requirements_schema_invalid(
+    "requirements-version-invalid",
+    lambda req: req.update({"requirements_version": "1.0"}))
+
+expect_requirements_semantic_failure(
+    "requirements-blocking-open-question",
+    lambda req: req["open_questions"][0].update({"blocking": True}))
+expect_requirements_semantic_failure(
+    "requirements-blocking-unknown",
+    lambda req: req["unknowns"][0].update({"blocking": True}))
+expect_requirements_semantic_failure(
+    "requirements-open-conflict",
+    lambda req: req["conflicts"][0].update({"status": "open"}))
+expect_requirements_semantic_failure(
+    "requirements-open-ambiguity",
+    lambda req: req["ambiguities"][0].update({"status": "open"}))
+expect_requirements_semantic_failure(
+    "requirements-vague-acceptance",
+    lambda req: req["acceptance_criteria"].append("尽快完成"))
+change_semantic = copy.deepcopy(change_output)
+
+def mutate_change_gate(req):
+    req["change_impact"]["gate_invalidation"] = []
+
+change_semantic_req = change_semantic["data"]["requirements"]
+mutate_change_gate(change_semantic_req)
+errs = validate_requirements_output(change_semantic, "requirements-change-no-gate-invalidation")
+check(bool(errs), "requirements-change-no-gate-invalidation: expected semantic failure")
+if errs:
+    negative_semantic[0] += 1
+
+# Ensure the unfailed structured/change examples pass semantic validation.
+check(not validate_requirements_output(structured_output, "structured-output"),
+      "structured output should pass semantic validation")
+check(not validate_requirements_output(change_output, "change-output"),
+      "change output should pass semantic validation")
+
 
 # 3. SemVer 2.0.0 positive/negative checks
 semver_valid = ["0.1.0", "1.0.0-alpha", "1.0.0-alpha.1", "1.0.0-0.3.7", "1.0.0+build.1", "1.0.0-rc.1+build.5"]
@@ -355,4 +547,5 @@ print(f"semver_valid={len(semver_valid)} semver_invalid={len(semver_invalid)}")
 print(f"yaml_blocks_checked={yaml_blocks} metadata_examples={metadata_examples} registry_ids={len(REGISTRY)}")
 print(f"negative_metadata_cases_passed={negative_metadata_cases}")
 print(f"optional_positive_cases_passed={optional_positive_cases} optional_negative_cases_passed={optional_negative_cases}")
+print(f"requirements_semantic_positive={requirements_semantic_positive} requirements_schema_negative={negative_schema[0]} requirements_semantic_negative={negative_semantic[0]}")
 print(f"runtime_behavior=NOT_EXECUTED platform_entries={len(platform.get('skills', {}))}")
