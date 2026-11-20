@@ -53,21 +53,23 @@ SDD 需要支持多个 AI Agent 平台：Codex、Claude Code、Cursor、Gemini C
 
 | 能力 | Codex | Claude Code | Cursor | Gemini CLI | OpenCode | OpenClaw |
 |------|-------|-------------|--------|------------|----------|----------|
-| Skill 发现 | ✅ | ✅ | ⚠️ | ⚠️ | ✅ | ✅ |
-| SKILL.md 元数据 | ✅ | ✅ | ✅ | ❓ | ✅ | ✅ |
-| 自动触发 | ✅ | ✅ | ⚠️ | ❌ | ✅ | ⚠️ |
-| 子 Agent | ❌ | ✅ | ❌ | ❌ | ❓ | ✅ |
-| 工具调用 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| 文件读写 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| 审批机制 | ⚠️ | ✅ | ⚠️ | ❌ | ❓ | ✅ |
-| 上下文传递 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| 工作流执行 | ❌ | ✅ | ❌ | ❌ | ❓ | ✅ |
+| Skill 发现 | ✅ | ✅ | ⚠️ | ❓ | ⚠️ | ❓ |
+| SKILL.md 元数据 | ✅ | ✅ | ⚠️ | ❓ | ⚠️ | ❓ |
+| 自动触发 | ✅ | ✅ | ❌ | ❌ | ❓ | ❓ |
+| 子 Agent | ❌ | ⚠️ | ❌ | ❌ | ❌ | ❓ |
+| 工具调用 | ✅ | ✅ | ✅ | ✅ | ✅ | ❓ |
+| 文件读写 | ✅ | ✅ | ✅ | ✅ | ✅ | ❓ |
+| 审批机制 | ⚠️ | ✅ | ⚠️ | ❌ | ❓ | ❓ |
+| 上下文传递 | ✅ | ✅ | ⚠️ | ⚠️ | ⚠️ | ❓ |
+| 工作流执行 | ❌ | ✅ | ❌ | ❌ | ❌ | ❓ |
 
 **图例：**
-- ✅ 原生支持
-- ⚠️ 通过适配支持
-- ❌ 不支持
-- ❓ 尚未验证
+- ✅ 预期原生支持（P0 未实测）
+- ⚠️ 预期通过适配支持
+- ❌ 预期不支持
+- ❓ 未评估 / 未验证
+
+> 注：本矩阵是**设计假设矩阵**，与 [platform-architecture.md](../architecture/platform-architecture.md) 的平台能力表对齐，P0 未做任何 SDD 平台实测。OpenClaw 的 SDD 能力全部标记为未验证；仅其 CLI 会话投递/读取能力有实测证据（见 platform-architecture.md §5）。P7 实测前不得作为兼容性结论。
 
 ## 适配层设计
 
@@ -76,15 +78,23 @@ platforms/
 ├── common/
 │   └── compatibility.md    # 兼容性总览
 ├── codex/
-│   └── README.md           # Codex 适配说明
+│   ├── README.md           # Codex 适配说明
+│   └── skill-metadata.yaml
 ├── claude-code/
-│   └── README.md           # Claude Code 适配说明
+│   ├── README.md           # Claude Code 适配说明
+│   └── skill-metadata.yaml
 ├── cursor/
-│   └── README.md           # Cursor 适配说明
+│   ├── README.md           # Cursor 适配说明
+│   └── skill-metadata.yaml
 ├── gemini-cli/
-│   └── README.md           # Gemini CLI 适配说明
-└── opencode/
-    └── README.md           # OpenCode 适配说明
+│   ├── README.md           # Gemini CLI 适配说明
+│   └── skill-metadata.yaml
+├── opencode/
+│   ├── README.md           # OpenCode 适配说明
+│   └── skill-metadata.yaml
+└── openclaw/
+    ├── README.md           # OpenClaw 适配说明
+    └── skill-metadata.yaml
 ```
 
 每个平台 README 包含：
@@ -110,3 +120,11 @@ platforms/
 - P7 阶段需进行实际跨平台测试
 - 需要建立兼容性验证工具
 - 平台 README 需随版本更新
+
+## 相关文档
+
+- [平台适配架构](../architecture/platform-architecture.md)
+
+## 修订记录
+
+- **2026-11-20（P0-002）**：统一六个平台清单（含 OpenClaw）与平台目录；将 OpenClaw 的 SDD 能力标记为未验证；能力矩阵明确为设计假设；补充平台元数据文件规划。

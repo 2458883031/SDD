@@ -30,13 +30,26 @@
 - [x] 项目路线图制定
 - [x] 自检与验收报告
 - [x] 整改报告编写
-- [ ] 自检与验收报告
+- [x] P0-002 架构一致性整改
+
+### P0-002 架构一致性整改
+
+- [x] 统一六个核心概念与依赖方向
+- [x] 统一 G1–G6 门禁（ADR-006 唯一权威）
+- [x] 分离 Skill 通用规范与平台元数据
+- [x] 明确 Workflow DAG、Review/Testing 并行与部署依赖
+- [x] 权限（R0–R4）与审批分离，补充风险矩阵与实现状态
+- [x] 统一六平台清单与能力声明
+- [x] 补充 Task Context / Artifact 生命周期
+- [x] 文档一致性、链接与 CLI 示例修正
+- [x] 生成 P0-002 整改报告
 
 ### 交付物
 - [docs/architecture/](../architecture/) — 架构设计文档
 - [docs/decisions/](../decisions/) — 架构决策记录
 - [docs/roadmap/](./) — 项目路线图
 - [docs/risks-and-questions.md](../risks-and-questions.md) — 风险与待确认事项
+- [docs/reports/2026-11-20-P0-002-架构整改报告.md](../reports/2026-11-20-P0-002-架构整改报告.md) — P0-002 整改报告
 
 ### 依赖关系
 - P1 依赖 P0 完成
@@ -102,10 +115,10 @@
 - [ ] 实现子 Agent 协作机制
 
 ### 交付物
-- [skills/development/orchestration/SKILL.md](../../../skills/development/orchestration/SKILL.md)
-- [core/schemas/workflow.schema.json](../../../core/schemas/workflow.schema.json)
-- [workflows/*.yaml](../../../workflows/) — 工作流定义
-- [tools/workflow-validator/](../../../tools/workflow-validator/) — 工作流验证工具
+- `skills/development/orchestration/SKILL.md`（P2 交付，尚未创建）
+- `core/schemas/workflow.schema.json`（P2 交付，尚未创建）
+- [workflows/*.yaml](../../workflows/) — 工作流定义
+- [tools/workflow-validator/](../../tools/workflow-validator/) — 工作流验证工具
 
 ### 依赖关系
 - 依赖 P0、P1 完成
@@ -134,9 +147,9 @@
 - [ ] 相关测试用例
 
 ### 交付物
-- [skills/development/requirements-clarity/](../../../skills/development/requirements-clarity/)
-- [skills/development/analysis/](../../../skills/development/analysis/)
-- [skills/development/design/](../../../skills/development/design/)
+- [skills/development/requirements-clarity/](../../skills/development/requirements-clarity/)
+- [skills/development/analysis/](../../skills/development/analysis/)
+- [skills/development/design/](../../skills/development/design/)
 
 ### 依赖关系
 - 依赖 P2 完成
@@ -165,9 +178,9 @@
 - [ ] 相关测试用例
 
 ### 交付物
-- [skills/development/coding/](../../../skills/development/coding/)
-- [skills/development/code-review/](../../../skills/development/code-review/)
-- [skills/development/testing/](../../../skills/development/testing/)
+- [skills/development/coding/](../../skills/development/coding/)
+- [skills/development/code-review/](../../skills/development/code-review/)
+- [skills/development/testing/](../../skills/development/testing/)
 
 ### 依赖关系
 - 依赖 P2、P3 完成
@@ -196,8 +209,8 @@
 - [ ] 部署模板
 
 ### 交付物
-- [skills/development/deployment/](../../../skills/development/deployment/)
-- [skills/development/documentation/](../../../skills/development/documentation/)
+- [skills/development/deployment/](../../skills/development/deployment/)
+- [skills/development/documentation/](../../skills/development/documentation/)
 
 ### 依赖关系
 - 依赖 P4 完成
@@ -223,7 +236,7 @@
 - [ ] 改进建议生成
 
 ### 交付物
-- [skills/development/feedback-loop/](../../../skills/development/feedback-loop/)
+- [skills/development/feedback-loop/](../../skills/development/feedback-loop/)
 
 ### 依赖关系
 - 依赖 P5 完成
@@ -252,8 +265,8 @@
 - [ ] 示例项目创建
 
 ### 交付物
-- [tests/compatibility/](../../../tests/compatibility/)
-- [docs/guides/](../../../docs/guides/)
+- [tests/compatibility/](../../tests/compatibility/)
+- [docs/guides/](../../docs/guides/)
 - 示例项目
 
 ### 依赖关系
@@ -284,15 +297,22 @@
 
 ## 当前状态
 
-**P0 进行中**
+**P0 In Review（待评审）**
 
 已完成：
 - 项目初始化
-- 目录结构创建
-- 基础文档编写
-- ADR 决策记录
+- 目录结构创建（67 个目录，48 个预留）
+- 7 篇架构文档
+- 6 个 ADR
+- 路线图与风险清单
+- 自检与交付报告、P0-001 整改报告
+- P0-002 架构一致性整改及报告
 
-待完成：
-- 平台兼容性研究
-- 风险与问题清单
-- 自检与验收报告
+待评审：
+- ChatGPT 架构评审与验收
+- 6 个待决策问题的答复
+
+未完成（后续阶段）：
+- 平台兼容性实证（P7）
+- 工作流 Schema（P1）
+- Skill 与测试实现（P2–P7）

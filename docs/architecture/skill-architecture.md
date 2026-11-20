@@ -1,51 +1,64 @@
 # Skill 架构设计
 
-## 概述
+## 1. 概述
 
-本文件定义 SDD 体系中 Skill 的标准结构、加载机制和最佳实践。
+本文件定义 SDD 体系中 Skill 的标准结构、加载机制和编写原则。Skill 的职责边界见 [system-architecture.md §2](./system-architecture.md#2-核心概念权威定义)。
 
-## Skill 标准结构
+Skill 规范分为两层：
 
-### 目录布局
+| 层次 | 内容 | 位置 | 是否跨平台 |
+|------|------|------|------------|
+| **A. 通用 Skill 核心规范** | 名称、描述、通用能力需求声明、正文结构、输入输出契约 | `skills/**/SKILL.md` | 是 |
+| **B. 平台适配元数据** | 平台发现路径、触发映射、二进制/环境变量、调用方式 | `platforms/<platform>/skill-metadata.yaml` | 否，由适配层处理 |
 
-```
+**核心规则：核心 SKILL.md 不得包含任何平台专属字段；平台差异不得改变核心 Skill 的语义。**
+
+## 2. Skill 标准结构
+
+### 2.1 目录布局
+
+```text
 skill-name/
 ├── SKILL.md              # 必需：Skill 主文件
 ├── scripts/              # 可选：可执行脚本
-│   ├── helper.sh
-│   └── validate.py
 ├── references/           # 可选：参考文档
-│   ├── aws.md
-│   ├── gcp.md
-│   └── azure.md
 ├── assets/               # 可选：输出模板
-│   ├── template.md
-│   └── schema.json
 └── examples/             # 可选：示例用例
-    ├── input.md
-    └── output.md
 ```
 
-### SKILL.md 元数据
+### 2.2 通用核心元数据（平台无关）
 
 ```yaml
 ---
 name: skill-name
-description: "触发场景描述 + 核心功能说明（160字符内）"
-user-invocable: true
-disable-model-invocation: false
+description: "Skill 的用途、适用场景和触发条件（建议 160 字符内）"
 
-# 条件激活（可选）
-metadata:
-  openclaw:
-    requires:
-      bins: []        # 必需的二进制工具
-      env: []         # 必需的环境变量
-    primaryEnv: ""    # 主要环境变量
+# 可选：平台无关的能力需求声明（声明需求，不是授权）
+requires:
+  runtime: [node>=20]                 # 或 python>=3.11 等
+  tools: [file-read, shell:exec:tests, git]
+  permissions: [fs:read:project, fs:write:project, shell:exec:test]
 ---
 ```
 
-### SKILL.md 正文结构
+**字段归属：**
+
+| 字段 | 归属 | 说明 |
+|------|------|------|
+| `name` | 核心 | 必需，稳定标识 |
+| `description` | 核心 | 必需，用于发现与路由 |
+| `requires.runtime` | 核心 | 运行环境需求（平台无关描述） |
+| `requires.tools` | 核心 | 需要的工具能力类别 |
+| `requires.permissions` | 核心 | 需要的最小权限类别，实际授予由安全模型决定 |
+| 平台发现路径 / 触发别名 / bins / env / primaryEnv / 调用参数 | 平台适配层 | 只能出现在 `platforms/<platform>/skill-metadata.yaml` |
+
+**禁止：**
+
+- 在核心 `SKILL.md` 中写 `metadata.openclaw`、平台专属环境变量或平台 CLI 参数。
+- 用平台元数据改变核心 Skill 的输入、输出或验收语义。
+- 把 `requires.permissions` 当作已授权；它只是需求声明，实际授权见 [security-architecture.md](./security-architecture.md)。
+
+### 2.3 SKILL.md 正文结构
 
 ```markdown
 # Skill 名称
@@ -93,9 +106,72 @@ metadata:
 - [skill-b](../skill-b/SKILL.md)
 ```
 
-## 渐进式披露机制
+## 3. 平台适配元数据
 
-### 三层加载
+### 3.1 目录规划
+
+```text
+platforms/
+├── common/
+│   └── compatibility.md
+├── codex/
+│   └── skill-metadata.yaml
+├── claude-code/
+│   └── skill-metadata.yaml
+├── cursor/
+│   └── skill-metadata.yaml
+├── gemini-cli/
+│   └── skill-metadata.yaml
+├── opencode/
+│   └── skill-metadata.yaml
+└── openclaw/
+    └── skill-metadata.yaml
+```
+
+> 以上为 P0 设计规划，本阶段不创建实际文件。六个平台清单与目录必须保持一致：Codex、Claude Code、Cursor、Gemini CLI、OpenCode、OpenClaw。
+
+### 3.2 平台元数据示例（设计示例，未创建）
+
+```yaml
+# platforms/openclaw/skill-metadata.yaml
+skill: skill-name
+
+discovery:
+  paths: [skills/]
+
+trigger:
+  mode: description_match
+  aliases: ["..."]
+  auto_invoke: true
+
+requirements:
+  bins: []
+  env: []
+  primaryEnv: ""
+
+invocation:
+  adapter: openclaw
+  approval_mode: interactive
+```
+
+### 3.3 平台字段处理规则
+
+1. **平台不支持某字段** — 适配层忽略并记录警告；核心 Skill 仍按通用字段工作。
+2. **平台扩展字段** — 只能影响发现、调用、环境准备和审批映射，不得改变核心语义。
+3. **冲突处理** — 以核心 `SKILL.md` 的输入/输出/验收契约为准；平台元数据不能覆盖。
+4. **校验** — P1 的 Skill 校验器同时校验核心字段和平台元数据；平台元数据缺少必需映射时，标记该平台为「不可用/降级」。
+5. **降级** — 平台缺失某能力时，由适配层提供降级路径（如串行替代并行），并在平台能力矩阵中标注。
+
+## 4. Skill 如何声明运行环境、依赖和权限
+
+- **运行环境**：`requires.runtime` 使用平台无关的版本约束（如 `node>=20`、`python>=3.11`）。
+- **依赖**：`requires.tools` 声明工具类别（如 `shell:exec:tests`），由适配层映射到平台实际工具。
+- **权限**：`requires.permissions` 声明最小权限需求，实际授予按 [security-architecture.md](./security-architecture.md) 的 R0–R4、默认拒绝和审批规则执行。
+- **就绪检查**：平台适配层在执行前检查 runtime/tools/env；不满足时 Skill 标记为 `not_ready`，不得静默降级为不安全操作。
+
+## 5. 渐进式披露机制
+
+### 5.1 三层加载
 
 | 层级 | 内容 | 加载时机 | 大小限制 |
 |------|------|----------|----------|
@@ -103,26 +179,26 @@ metadata:
 | L2 | SKILL.md body | 触发时 | <500 行 |
 | L3 | Bundled resources | 按需 | 无限制 |
 
-### 使用原则
+### 5.2 使用原则
 
-1. **Metadata 是路由关键** — 描述要全面，覆盖各种触发场景
-2. **SKILL.md 保持精简** — 核心逻辑在内，细节放 references
-3. **按需加载 References** — 大文件用目录索引，避免全量加载
+1. **Metadata 是路由关键** — 描述要全面，覆盖各种触发场景。
+2. **SKILL.md 保持精简** — 核心逻辑在内，细节放 references。
+3. **按需加载 References** — 大文件用目录索引，避免全量加载。
 
 ```markdown
 ## 参考文档
 - [详细规范](references/detailed-spec.md) — 仅当需要完整规范时阅读
-- [平台适配](references/platforms/claude-code.md) — Claude Code 专属配置
+- 平台适配说明 — 见 `platforms/<platform>/README.md`
 - [故障排查](references/troubleshooting.md) — 常见问题解决方案
 ```
 
-## Domain Organization
+> 平台专属配置应放在 `platforms/<platform>/`，references 中只保留说明性内容。
 
-### 多技术栈组织
+## 6. Domain Organization
 
 当 Skill 支持多种技术栈时，按 variant 组织：
 
-```
+```text
 deployment/
 ├── SKILL.md              # 工作流 + 选择逻辑
 └── references/
@@ -132,23 +208,23 @@ deployment/
     └── gcp.md            # GCP 部署
 ```
 
-调用规则：
-```
-Agent 根据任务上下文决定读取哪个 reference 文件
-例如：检测到 Dockerfile → 读取 docker.md
-```
+调用规则：Agent 根据任务上下文决定读取哪个 reference 文件。例如检测到 Dockerfile → 读取 `docker.md`。
 
-## Skill 编写原则
+## 7. Skill 编写原则
 
-### 1. 单一职责
+### 7.1 单一职责
+
 每个 Skill 只做一件事，做好一件事。
 
-### 2. 明确边界
+### 7.2 明确边界
+
 - 输入什么 → 输出什么
 - 什么情况触发 → 什么情况不触发
 - 能做什么 → 不能做什么
+- 需要什么权限 → 不默认拥有权限
 
-### 3. 解释 WHY
+### 7.3 解释 WHY
+
 不要只写 MUST/NEVER，要解释为什么重要。
 
 ```markdown
@@ -160,7 +236,8 @@ Validate input first to prevent cascading failures.
 If input is invalid, early rejection saves time and avoids confusing errors later.
 ```
 
-### 4. 渐进增强
+### 7.4 渐进增强
+
 简单情况走快速路径，复杂情况走完整流程。
 
 ```markdown
@@ -171,65 +248,59 @@ If input is invalid, early rejection saves time and avoids confusing errors late
 如果需要分析影响范围或设计新架构，先执行 requirements-clarity。
 ```
 
-## 平台适配策略
+## 8. 平台适配策略
 
-### 核心 vs 适配
+### 8.1 核心 vs 适配
 
 | 内容 | 位置 | 说明 |
 |------|------|------|
 | 通用逻辑 | `skills/development/*/SKILL.md` | 所有平台通用 |
-| 平台特定 | `platforms/<platform>/` | 平台专属配置 |
-| 适配层 | `platforms/common/compatibility.md` | 兼容性矩阵 |
+| 平台元数据 | `platforms/<platform>/skill-metadata.yaml` | 平台专属，不进入核心 |
+| 兼容性总览 | `platforms/common/compatibility.md` | 与 `platform-architecture.md` 一致 |
 
-### 兼容性检查清单
+### 8.2 兼容性状态
 
-在 `platforms/<platform>/README.md` 中记录：
+平台能力状态统一在 [platform-architecture.md](./platform-architecture.md) 维护。未实测能力必须标记为「设计假设」或「待验证」，不得写「完全兼容」。
 
-```markdown
-## 兼容性状态
+## 9. 测试与验证
 
-| 能力 | 状态 | 备注 |
+### 9.1 CLI 示例标注规则
+
+文档中的 CLI 示例必须标注状态：
+
+- **已验证**：注明验证日期与 OpenClaw 版本。
+- **伪代码**：说明不是实际可执行命令。
+- **规划示例**：说明对应能力尚未实现。
+
+### 9.2 当前可用的 OpenClaw 命令
+
+| 示例 | 状态 | 说明 |
 |------|------|------|
-| Skill 发现 | ✅ 原生支持 | 自动扫描 skills/ 目录 |
-| SKILL.md 元数据 | ✅ 支持 | name + description 必需 |
-| 自动触发 | ⚠️ 部分支持 | 需验证 trigger 语义 |
-| 子 Agent | ❌ 不支持 | 暂无法并行执行 |
-| 工具调用 | ✅ 支持 | 映射 exec/read/write |
-| 审批机制 | ⚠️ 部分支持 | 需适配交互方式 |
-```
+| `openclaw skills list` | 已验证（2026-11-20，2026.11.4） | 列出可用 Skills |
+| `openclaw skills info <name>` | 命令存在，未逐项实测 | 查看 Skill 详情 |
+| `openclaw agent --session-key '<key>' --message-file '<file>'` | 已验证（2026-11-20，2026.11.4） | 向既有会话投递任务 |
+| `openclaw agent --message "..." --skill <name>` | **无效** | 当前 CLI 没有 `--skill` 参数，禁止使用 |
+| `/skill <name>` | 伪代码 | 平台 UI 交互示意，未验证 |
 
-## 测试与验证
+### 9.3 集成测试
 
-### 本地测试
-
-```bash
-# 列出已加载的 Skills
-openclaw skills list
-
-# 测试特定 Skill
-openclaw agent --message "trigger skill by description" --skill skill-name
-
-# 或手动调用
-/skill skill-name
-```
-
-### 集成测试
-
-在 `tests/workflow/` 下定义端到端测试用例：
+集成测试用例属于 P5–P7 规划；当前仓库没有可执行测试。
 
 ```yaml
-# tests/workflow/feature-development.yaml
+# 规划示例：tests/workflow/feature-development.yaml（P5–P7 实现）
 name: feature-development
 description: "完整功能开发流程测试"
 steps:
   - trigger: "帮我做一个用户管理功能"
     expected_skills: [requirements-clarity, analysis, design, coding, testing]
-    expected_gates: [G1, G2]
-    expected_artifacts: [requirements.md, analysis.md, design.md, code/, test-report.md]
+    expected_gates: [G1, G2, G3, G4, G5]
+    expected_artifacts: [requirements, analysis, design, implementation, test-report]
 ```
 
-## 当前状态
+## 10. 当前状态
 
+- [x] 通用 Skill 规范与平台元数据分离（P0-002）
 - [x] 结构规范定义
+- [x] CLI 示例状态标注
 - [ ] 模板文件创建（P1）
 - [ ] 平台适配验证（P7）

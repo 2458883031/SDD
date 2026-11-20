@@ -128,6 +128,22 @@ L6 · 平台适配层
 3. **P3-P6** — 逐步实现各层 Skill
 4. **P7** — 跨平台集成测试
 
+## P0-002 修订：L6 的依赖方向
+
+P0-002 对分层语义做以下澄清（不改变六层编号）：
+
+1. **L6 是平台适配边界，不是核心的普通向下层。** 源码依赖方向是 `L6 → Core Ports`；核心不依赖任何具体平台实现。
+2. 核心（L1–L5）只依赖抽象端口：ToolPort、DiscoveryPort、MetadataPort、ApprovalPort、ContextPort。
+3. 原「L4 与 L5 双向依赖」的表述修正为 **L4 依赖 L5**，L5 不依赖 L4；避免循环依赖歧义。
+4. 原「下层不能反向依赖上层」保留；L6 通过实现核心端口向内依赖，而不是让核心反向 import 平台代码。
+5. L6 保留编号是为了与 P0-001 的文档、目录和路线图连续；逻辑上它被画成独立边界。
+
+权威定义和图示见 [system-architecture.md §2–§3](../architecture/system-architecture.md)。
+
+## 修订记录
+
+- **2026-11-20（P0-002）**：明确 L6 为适配边界与依赖方向；核心只依赖端口；修正 L4/L5 双向依赖表述；六个核心概念与职责边界统一由 system-architecture.md §2 定义。
+
 ## 参考资料
 
 - [obra/superpowers](https://github.com/obra/superpowers) — 参考了其自然流程编排

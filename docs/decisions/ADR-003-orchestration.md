@@ -64,26 +64,56 @@
 
 ## 关键设计
 
+### 编排引擎与 orchestration Skill
+
+| 对象 | 位置 | 职责 |
+|------|------|------|
+| Orchestration Engine | `core/orchestration/`（P2 规划） | 任务识别、拆解、路由、DAG 执行、状态、结果汇总 |
+| orchestration Skill | `skills/development/orchestration/` | 可选入口：辅助 Agent 识别任务、选择 Workflow |
+
+- 编排引擎不是 Skill；`SKILL.md` 不是引擎。
+- orchestration Skill 可以调用引擎公开接口，但不得把全部编排逻辑写进一个 Skill。
+- 引擎不依赖任何平台专属能力；平台差异由 L6 适配。
+
 ### 任务分类与路由
 
-| 任务类型 | 复杂度 | 推荐工作流 | 强制门禁 |
+| 任务类型 | 复杂度 | 推荐工作流 | 必需门禁 |
 |----------|--------|-----------|----------|
-| simple_change | L1 | coding → testing | 无 |
-| bug_fix | L2 | analysis → coding → testing → review | G4 |
-| feature_dev | L2/L3 | req → analysis → design → coding → test | G1, G2, G4, G5 |
-| refactoring | L3 | analysis → design → coding → review → test | G2, G4, G5 |
-| new_project | L3 | req → analysis → design → coding → test → deploy | G1, G2, G4, G5, G6 |
-| deployment | L2 | analysis → deployment | G6 |
+| simple_change | L1 | simple-task | G4/G5 简化，安全约束不跳过 |
+| bug_fix | L2 | bug-fix | G4、G5 |
+| feature_dev | L2/L3 | feature-development | G1、G2、G3、G4、G5（部署时 G6） |
+| refactoring | L3 | refactoring | G1、G2、G3、G4、G5（部署时 G6） |
+| new_project | L3 | new-project | G1、G2、G3、G4、G5、G6 |
+| deployment | L2 | deployment | G6；涉及代码/配置变更时还需 G4/G5 |
+| consultation | L1/L2 | consultation | 无代码门禁；输出分析/设计产物 |
+
+### Workflow DAG 依赖
+
+```text
+                 ┌── code-review (G4) ──┐
+coding ──────────┤                      ├── quality gate (G4 AND G5) ── deployment (G6) ── verification
+                 └── testing (G5) ──────┘
+```
+
+- Code Review 与 Testing 可以并行，但**不能互相替代**。
+- 两者都必须通过 G4/G5，才允许进入 Deployment。
+- Review 严重问题回到 coding；Testing 失败按缺陷类型回到 coding/analysis/requirements。
+- Deployment 必须依赖质量门禁，不得绕过。
+
+Workflow 节点字段、失败路径、重试、超时和审批暂停/恢复语义见 [orchestration-architecture.md](../architecture/orchestration-architecture.md)。本 ADR 只确定调度策略与依赖原则。
 
 ### HARD-GATE 设计
 
-借鉴 Superpowers 的 HARD-GATE 机制：
-- 门禁前必须暂停等待人工确认
-- AI 不能假设用户已同意
-- 每个门禁有明确的检查清单
+- G1–G6 的触发条件、自动检查、人工审批、跳过规则、失败回退和审计要求的**唯一权威定义见 [ADR-006](./ADR-006-quality-gates.md)**。
+- 本 ADR 只规定门禁在 Workflow 中的挂载位置。
+- AI 不能把用户未批准的操作当作已批准；超时、沉默不等于批准。
 
 ## 后续影响
 
 - P2 阶段实现编排引擎
 - 需定义工作流 Schema（core/schemas/workflow.schema.json）
 - 需实现验证工具（tools/workflow-validator/）
+
+## 修订记录
+
+- **2026-11-20（P0-002）**：明确编排引擎与 orchestration Skill 的边界；将 Review/Testing 定义为并行且共同满足质量门禁；Deployment 必须依赖 G4/G5；门禁规则统一引用 ADR-006；Workflow DAG 语义独立定义。

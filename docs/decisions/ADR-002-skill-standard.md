@@ -89,3 +89,48 @@ skill-name/
 - P1 阶段需定义 Schema 验证工具
 - P7 阶段需验证各平台兼容性
 - 平台适配层需维护兼容性矩阵
+
+## P0-002 修订：通用规范与平台元数据分离
+
+P0-002 明确 Skill 规范分为两层，核心规范不得依赖平台：
+
+### A. 通用核心规范（`skills/**/SKILL.md`）
+
+```yaml
+---
+name: skill-name
+description: "用途、适用场景和触发条件"
+
+# 可选：平台无关的能力需求声明（声明需求，不是授权）
+requires:
+  runtime: [node>=20]
+  tools: [file-read, shell:exec:tests]
+  permissions: [fs:read:project, fs:write:project]
+---
+```
+
+- 只包含 `name`、`description` 和通用 `requires`。
+- 不包含 `metadata.openclaw`、平台环境变量、平台 CLI 参数等平台专属字段。
+- `requires.permissions` 只是需求声明，实际授予由安全模型决定（见 security-architecture.md）。
+
+### B. 平台适配元数据（`platforms/<platform>/skill-metadata.yaml`）
+
+- 负责发现路径、触发映射、bins/env、调用方式和审批模式。
+- 只能影响发现、调用、环境准备和审批映射，不得改变核心 Skill 的输入/输出/验收语义。
+- 平台不支持某字段时，适配层忽略并记录警告；必要时降级。
+- 六个平台目录统一：Codex、Claude Code、Cursor、Gemini CLI、OpenCode、OpenClaw。
+
+### 字段归属与处理
+
+| 内容 | 归属 | 规则 |
+|------|------|------|
+| name / description | 核心 | 必需，跨平台 |
+| requires.runtime / tools / permissions | 核心 | 平台无关的需求声明 |
+| 发现路径 / 触发别名 / bins / env / 调用参数 | 平台元数据 | 不进入核心 |
+| 平台扩展字段 | 平台元数据 | 不得改变核心语义 |
+
+详细规则见 [skill-architecture.md](../architecture/skill-architecture.md) 与 [platform-architecture.md](../architecture/platform-architecture.md)。
+
+## 修订记录
+
+- **2026-11-20（P0-002）**：将通用 Skill 核心规范与平台适配元数据分离；核心规范移除平台专属字段；明确 `requires` 为需求声明而非授权。

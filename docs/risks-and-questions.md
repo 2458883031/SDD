@@ -23,10 +23,14 @@
 
 | 平台 | 已知限制 | 验证状态 |
 |------|----------|----------|
-| Codex | 子 Agent 不支持 | 待验证 |
-| Cursor | 自动触发机制不同 | 待验证 |
-| Gemini CLI | 无内置 Skill 支持 | 待验证 |
-| OpenCode | 生态较新 | 待验证 |
+| Codex | 子 Agent 预期不支持；工作流需适配 | 设计假设，未实测 |
+| Claude Code | 子 Agent/Workflow 映射需适配 | 设计假设，未实测 |
+| Cursor | 自动触发/子 Agent 预期不支持 | 设计假设，未实测 |
+| Gemini CLI | 无内置 Skill 支持；审批机制缺失 | 设计假设，未实测 |
+| OpenCode | 生态较新，能力不确定 | 设计假设，未实测 |
+| OpenClaw | SDD Skill/Workflow/审批未验证；仅 CLI 会话能力有证据 | 部分验证（仅 CLI），SDD 能力待验证 |
+
+> 平台能力矩阵与证据范围见 [platform-architecture.md](architecture/platform-architecture.md) 与 [ADR-004](decisions/ADR-004-cross-platform.md)。未实测能力不得写成已支持或完全兼容。
 
 ## 待验证事项
 
@@ -110,8 +114,22 @@
 - 不宣称功能已实现（只写规划）
 - 所有待验证事项明确标注
 
+## P0-002 已收敛事项
+
+以下架构一致性问题已在 P0-002 收敛，不再作为开放风险：
+
+- 六个核心概念与职责边界（Agent / Orchestration / Workflow / Skill / Tool / Platform Adapter）
+- G1–G6 门禁的统一定义、失败回退与审计（ADR-006）
+- 通用 Skill 规范与平台元数据的分离
+- Workflow DAG：Review/Testing 并行、双门禁、部署依赖
+- 权限（R0–R4）与审批控制的分离与风险矩阵
+- 六平台清单统一（含 OpenClaw）与未验证声明
+- Task Context / Artifact 的字段、归属、版本、并发与归档
+
+仍待后续阶段解决：沙箱/权限运行时、Workflow Schema、编排引擎、跨平台实测、安全测试。
+
 ## 下一步行动
 
-1. 等待用户对上述问题的反馈
-2. 根据反馈调整 P1 计划
-3. 开始平台兼容性研究
+1. 等待 ChatGPT 对 P0-002 的复审
+2. P0 正式验收通过后再进入 P1
+3. P7 阶段进行平台兼容性实测与证据收集
