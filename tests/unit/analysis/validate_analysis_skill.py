@@ -138,18 +138,31 @@ def analysis_ref_exists(ref, analysis, candidate_ids, risk_ids, design_considera
     return ref in candidate_ids or ref in risk_ids or ref in design_considerations
 
 
+SHA256_RE = re.compile(r"[a-f0-9]{64}")
+
+
+def artifact_sha(ref):
+    if not isinstance(ref, str):
+        return None
+    match = SHA256_RE.search(ref)
+    return match.group(0) if match else None
+
+
 def is_requirements_ref(ref, analysis):
     req = analysis.get("source_requirements_ref")
     if not isinstance(req, dict) or not isinstance(ref, str):
         return False
-    return ref in {
-        req.get("path"),
-        ref_key(req),
-        req.get("sha256"),
-    }
+    if ref in {req.get("path"), ref_key(req)}:
+        return True
+    sha = artifact_sha(ref)
+    req_sha = req.get("sha256")
+    return bool(sha and req_sha and sha == req_sha)
 
 
 def resolved_evidence_exists(ref, analysis):
+    # Resolution evidence must carry an immutable SHA-256 identity.
+    if not artifact_sha(ref):
+        return False
     if is_requirements_ref(ref, analysis):
         return False
     evidence = set()
@@ -673,11 +686,13 @@ def mapped_acceptance_missing_ref(a):
 expect_trace_failure("trace-mapped-acceptance-missing-ref", mapped_acceptance_missing_ref)
 
 resolved_positive = copy.deepcopy(base)
+resolved_independent_ref = "docs/evidence/independent-facts.md@1#" + "d" * 64
+resolved_positive["data"]["analysis"]["facts"][0]["evidence_refs"].append(resolved_independent_ref)
 for item in resolved_positive["data"]["analysis"]["requirements_traceability"]["items"]:
     if item.get("source_type") == "non_goal":
         item.update({
             "disposition": "resolved",
-            "resolution_evidence_refs": ["docs/architecture/module-architecture.md"],
+            "resolution_evidence_refs": [resolved_independent_ref],
         })
         break
 resolved_errs = validate_analysis_output(resolved_positive, "trace-resolved-with-evidence", full_input)
@@ -717,12 +732,16 @@ def expect_resolved_failure(label, ref):
         resolved_negative_cases += 1
 
 
-def expect_resolved_pass(label, ref):
-    global resolved_positive_cases
-    errs = validate_analysis_output(resolved_output(ref), label, full_input)
-    check(not errs, f"{label}: expected valid evidence: {errs[:3]}")
-    if not errs:
-        resolved_positive_cases += 1
+def resolved_with_evidence(kind, ref):
+    obj = resolved_output(ref)
+    a = obj["data"]["analysis"]
+    if kind == "facts":
+        a["facts"][0]["evidence_refs"].append(ref)
+    elif kind == "candidate":
+        a["candidate_solutions"][0]["evidence_refs"].append(ref)
+    elif kind == "risk":
+        a["risk_assessment"][0]["evidence_refs"].append(ref)
+    return obj
 
 
 expect_resolved_failure("resolved-user-stated-statement", "需求要求组合筛选。")
@@ -737,15 +756,49 @@ check(bool(only_statement_errs), "resolved-only-statement: expected rejection")
 if only_statement_errs:
     resolved_negative_cases += 1
 
-expect_resolved_pass("resolved-fact-evidence", "docs/architecture/module-architecture.md")
-expect_resolved_pass("resolved-candidate-evidence", "docs/architecture/system-architecture.md")
-expect_resolved_pass("resolved-risk-evidence", "docs/architecture/security-architecture.md")
+fact_ref = "docs/evidence/independent-facts.md@1#" + "d" * 64
+candidate_ref = "docs/evidence/independent-candidate.md@1#" + "e" * 64
+risk_ref = "docs/evidence/independent-risk.md@1#" + "f" * 64
+for label, kind, ref in (
+    ("resolved-fact-evidence", "facts", fact_ref),
+    ("resolved-candidate-evidence", "candidate", candidate_ref),
+    ("resolved-risk-evidence", "risk", risk_ref),
+):
+    errs = validate_analysis_output(resolved_with_evidence(kind, ref), label, full_input)
+    check(not errs, f"{label}: expected valid independent evidence: {errs[:3]}")
+    if not errs:
+        resolved_positive_cases += 1
 
 # Requirements/source registrations cannot prove resolution.
 req_ref = base["data"]["analysis"]["source_requirements_ref"]
-expect_resolved_failure("resolved-requirements-path", req_ref["path"])
+req_sha = req_ref["sha256"]
+req_path = req_ref["path"]
+expect_resolved_failure("resolved-requirements-path", req_path)
 expect_resolved_failure("resolved-requirements-ref-key", ref_key(req_ref))
-expect_resolved_failure("resolved-requirements-hash", req_ref["sha256"])
+expect_resolved_failure("resolved-requirements-hash", req_sha)
+expect_resolved_failure(
+    "resolved-requirements-same-sha-different-path",
+    "other/path/requirements-copy.md@1#" + req_sha,
+)
+expect_resolved_failure(
+    "resolved-requirements-same-sha-different-dir",
+    "different/dir/file.md@1#" + req_sha,
+)
+expect_resolved_failure(
+    "resolved-requirements-normalized-alias",
+    req_path + "#" + req_sha,
+)
+
+alias_ref = "docs/copies/requirements-copy.md@1#" + req_sha
+for label, kind in (
+    ("resolved-requirements-alias-in-facts", "facts"),
+    ("resolved-requirements-alias-in-candidate", "candidate"),
+    ("resolved-requirements-alias-in-risk", "risk"),
+):
+    errs = validate_analysis_output(resolved_with_evidence(kind, alias_ref), label, full_input)
+    check(bool(errs), f"{label}: expected Requirements alias rejection")
+    if errs:
+        resolved_negative_cases += 1
 
 ordinary_ref = {
     "path": "docs/notes/background.md",

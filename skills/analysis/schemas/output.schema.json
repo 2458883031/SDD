@@ -324,7 +324,14 @@
           "enum": ["analyzed", "mapped", "retained", "resolved", "not_applicable", "deferred"]
         },
         "analysis_refs": { "type": "array", "items": { "type": "string", "minLength": 1 } },
-        "resolution_evidence_refs": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "resolution_evidence_refs": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "[a-f0-9]{64}",
+            "description": "必须包含不可变 SHA-256；不得使用纯 path 或普通来源登记"
+          }
+        },
         "rationale": { "type": "string" }
       },
       "allOf": [
