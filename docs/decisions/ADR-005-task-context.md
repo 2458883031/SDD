@@ -55,6 +55,7 @@ Task Context 是任务执行期间的统一上下文，至少包含：
 | 字段 | 说明 |
 |------|------|
 | `task-id` | 任务唯一标识，格式 `task-YYYYMMDD-<short-uuid>` |
+| `parent-task-id` | 可选；重试实例或派生任务指向原任务 |
 | `project-root` | 项目根目录（规范化绝对路径） |
 | `task-type` | 任务类型（与 orchestration-architecture.md 一致） |
 | `complexity` | L1 / L2 / L3 |
@@ -74,16 +75,66 @@ Task Context 是任务执行期间的统一上下文，至少包含：
 
 **状态机：**
 
+**正常流程（无需审批）：**
+
 ```text
-created → planned → executing → awaiting_approval → verifying → completed
-                         │              │
-                         ├──────────────┴──► failed
-                         └──────────────────► aborted
+created
+  ↓
+planned
+  ↓
+executing
+  │  （无需审批且节点完成）
+  ↓
+verifying
+  ↓
+completed
 ```
 
-- `awaiting_approval` 只能由显式批准恢复；超时不等于批准。
-- `failed` / `aborted` 保留已生成产物和失败原因。
-- `completed` 后 Task Context 冻结。
+**审批流程：**
+
+```text
+executing
+  ↓
+awaiting_approval
+  ├── approved → executing（恢复原 current-stage）
+  ├── rejected → aborted
+  └── timeout  → aborted（原因 approval_timeout）
+```
+
+**异常流程：**
+
+```text
+executing / verifying
+  ├── failed   （执行已发生但不可恢复）
+  └── aborted  （主动终止/审批拒绝/审批超时/策略停止）
+```
+
+**状态转换表：**
+
+| From | To | 条件 | 说明 |
+|------|----|------|------|
+| created | planned | Task Context 初始化完成 | 尚未开始执行 |
+| planned | executing | Workflow 开始 | 进入当前节点 |
+| executing | verifying | 无需审批且节点完成 | 允许直接进入验证 |
+| executing | awaiting_approval | 触发审批条件（G 门禁/SA） | 暂停并保存 current-stage |
+| awaiting_approval | executing | 显式批准 | 恢复原 current-stage，不丢上下文 |
+| awaiting_approval | aborted | 显式拒绝 | 记录拒绝原因与审批记录 |
+| awaiting_approval | aborted | 审批超时 | 原因 `approval_timeout`；超时不等于批准 |
+| executing | failed | 不可恢复执行错误 | 保留产物与错误详情 |
+| verifying | failed | 验证不可恢复失败 | 保留产物与错误详情 |
+| executing / verifying | aborted | 用户取消或策略终止 | 记录终止原因 |
+| verifying | completed | 验证通过 | Task Context 冻结 |
+
+**规则：**
+
+1. 不需要审批的任务允许直接从 `executing` 进入 `verifying`；只有触发审批条件的任务才能进入 `awaiting_approval`。
+2. 审批通过后恢复**原 current-stage**，不得丢失 Task Context、Artifact 引用或审批记录。
+3. 审批拒绝的终止语义为 `aborted`；不可当作 `failed` 或继续执行。
+4. 审批超时的处理为 `aborted`（`approval_timeout`）；超时不得视为批准，也不得自动放行。
+5. `failed` 表示执行已尝试但不可恢复；`aborted` 表示主动终止、拒绝或策略停止。两者都必须保留原因和产物。
+6. 重试必须保留原任务与 Artifact 历史；重试在**新的 task-id** 下进行，并通过 `parent-task-id` 指向原任务（或作为明确的 retry 实例）。
+7. `completed` / `failed` / `aborted` 为终止状态，**禁止从终止状态直接恢复执行**；如需重新执行，创建新任务或新重试实例。
+8. Workflow 的节点状态（如 `awaiting_approval`）与 Task Context 的 `task-status` 同名但作用域不同：节点状态描述单个节点，`task-status` 描述整个任务；两者必须同步记录。
 
 ### 2. Artifact
 
@@ -176,3 +227,4 @@ artifacts/
 ## 修订记录
 
 - **2026-11-20（P0-002）**：补充 Task Context 字段与状态机、Artifact 归属/版本/来源、写入权限与并发、跨任务隔离与归档；明确 `platform-config` 只是引用，不混入平台配置；与安全架构的只读共享和写入隔离对齐。
+- **2026-11-20（P0-003）**：补全正常/审批/异常状态机；明确审批通过恢复原 current-stage、拒绝/超时终止、failed 与 aborted 区别、终止状态不可恢复、重试实例与新 `task-id`；新增 `parent-task-id`。

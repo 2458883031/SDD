@@ -121,7 +121,7 @@ routing_rules:
 | `retry` | `{max, backoff}`；默认最多 3 次，指数退避 |
 | `timeout_seconds` | 节点超时；超时按失败处理 |
 | `approval` | `{gate, pause, resume}`；`gate` 取 G1–G6，暂停等待显式批准 |
-| `gate` | 节点后置门禁（G1–G6）；语义见 ADR-006 |
+| `gate` | 节点关联门禁（G1–G6）；G1–G5 在节点产出后检查，G6 在生产部署动作前检查；语义见 ADR-006 |
 | `artifacts` | 该节点必须产出的产物清单 |
 
 ### 3.2 基础 DAG（功能开发）
@@ -213,7 +213,7 @@ nodes:
     type: skill
     skill: deployment
     depends_on: [quality_gate]
-    gate: G6
+    gate: G6                 # G6 在部署动作前检查；不是部署后验证
     condition: "deployment_requested == true"
     on_success: verification
     on_failure: rollback
@@ -314,17 +314,43 @@ nodes:
     skill: coding
     outputs: [implementation]
 
-  - id: checks
-    type: check
+  - id: code_review
+    type: skill
+    skill: code-review
     depends_on: [coding]
-    checks: [lint, typecheck, focused-tests]
-    on_failure: coding
+    gate: G4
+    parallel_group: quality
+    outputs: [review-report]
+
+  - id: testing
+    type: skill
+    skill: testing
+    depends_on: [coding]
+    gate: G5
+    parallel_group: quality
+    outputs: [test-report]
+
+  - id: quality_gate
+    type: gate
+    depends_on: [code_review, testing]
+    requires: [G4, G5]
+    on_failure:
+      review_severe: coding
+      review_minor: coding
+      testing_failed: coding
+    on_success: end
 
   - id: end
     type: end
 ```
 
-简单修改允许省略需求/分析/设计，但仍需必要的自动检查与验证；不得绕过安全约束。G4/G5 可以使用简化版，但必须有记录。
+简单修改允许省略需求/分析/设计，但必须包含：
+
+- **独立 Code Review（简化 G4）**：Reviewer 必须与代码作者独立；作者自审、Lint、Typecheck 均不能替代独立 Review。
+- **必要测试（简化 G5）**：至少执行与变更相关的聚焦测试/检查。
+- 两者可以并行，但质量门禁必须是 **G4 AND G5**；Review 失败返回 coding 修复后重新 Review。
+- 纯文档变更可将 G4 标记为 N/A；任何代码变更不得跳过 G4。
+- 不得因为任务简单而绕过安全约束。
 
 ### 3.6 失败、重试、超时与审批
 
@@ -372,24 +398,30 @@ node_states:
 | G3 | coding 之前 | 开发计划确认 |
 | G4 | code-review 之后 | 代码质量 |
 | G5 | testing 之后 | 测试验收 |
-| G6 | deployment 之前/之后 | 部署授权与验证 |
+| G6 | 生产部署动作之前 | 部署授权（不含部署后验证） |
+
+> **G6 位置：** G6 必须在生产部署动作发生**之前**通过。部署后的健康检查/冒烟/验收属于 **Deployment Verification**，不是 G6，也不能替代 G6。非生产环境是否需要审批按权限模型决定，不使用 G6。
 
 ## 5. 任务类型与流程
 
 | 任务类型 | 复杂度 | 推荐 Workflow | 必需门禁 |
 |----------|--------|---------------|----------|
-| simple_change | L1 | simple-task | G4/G5 简化，安全约束不跳过 |
+| simple_change | L1 | simple-task | G4（简化，独立 Review 不跳过）、G5（简化）；安全约束不跳过 |
 | bug_fix | L2 | bug-fix | G4、G5 |
-| feature_dev | L2/L3 | feature-development | G1、G2、G3、G4、G5（部署时 G6） |
-| refactoring | L3 | refactoring | G1、G2、G3、G4、G5（部署时 G6） |
-| new_project | L3 | new-project | G1、G2、G3、G4、G5、G6 |
-| deployment_task | L2 | deployment | G6；如涉及代码变更还需 G4/G5 |
+| feature_dev | L2/L3 | feature-development | G1、G2、G3、G4、G5（生产部署时 G6） |
+| refactoring | L3 | refactoring | G1、G2、G3、G4、G5（生产部署时 G6） |
+| new_project | L3 | new-project | G1、G2、G3、G4、G5；G6 仅计划生产部署 |
+| deployment_task | L2 | deployment | 涉及代码/配置时 G4、G5；生产部署时 G6；非生产部署不触发 G6 |
 | technical_consultation | L1/L2 | consultation | 无需代码门禁；输出设计/分析产物 |
+
+> 门禁规则以 [ADR-006](../decisions/ADR-006-quality-gates.md) 为准；本表只表示任务类型到 Workflow 的映射，不重新定义门禁规则。
 
 ## 6. Task Context 与产物
 
 - 创建者：Orchestration Engine 在任务入口创建 `task-id`；无编排引擎时由执行的 Agent 创建并记录 `created_by`。
 - 维护者：Orchestration Engine 维护状态；ArtifactManager 维护产物索引。
+- 状态机：正常 `created → planned → executing → verifying → completed`；审批 `executing → awaiting_approval → approved → executing`，`rejected/timeout → aborted`；异常 `executing/verifying → failed/aborted`。权威定义见 [ADR-005](../decisions/ADR-005-task-context.md)。
+- 终止状态（`completed/failed/aborted`）不可恢复执行；重试需创建新 `task-id`，并通过 `parent-task-id` 指向原任务。
 - 路径、归属、版本、并发、归档规则：见 [ADR-005](../decisions/ADR-005-task-context.md)。
 - 本文件中的 `inputs` / `outputs` 均使用 ADR-005 的 Artifact 引用格式（路径 + 版本 + hash）。
 

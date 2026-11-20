@@ -1,0 +1,544 @@
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index 43b53f2..ff9a202 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -22,8 +22,15 @@
+   - 权限（R0–R4）与审批分离，补充风险矩阵与实现状态
+   - 统一六平台清单（含 OpenClaw）与未验证声明
+   - 补充 Task Context / Artifact 生命周期
++- 2026-11-20：P0-003 最终架构收敛
++  - 简单修改 Workflow 增加独立 Code Review，G4 AND G5
++  - 统一 R0–R4 权限口径与 G6/SA 边界
++  - 补全 Task Context 正常/审批/异常/终止状态机
++  - G6 统一为生产部署动作之前的授权门禁
++  - 补充 P0-002 报告的提交 1829775 记录
+ 
+ ### 修复
+ - 2026-11-20：修正 P0-001 遗留的文档冲突、链接、CLI 示例与状态标注
++- 2026-11-20：修正 P0-002 复审发现的简单 Workflow、权限、状态机与 G6 歧义
+ 
+ ### 删除
+diff --git a/README.md b/README.md
+index 0c48e5a..9c4a35e 100644
+--- a/README.md
++++ b/README.md
+@@ -37,7 +37,7 @@ SDD 不是简单的 Skill 集合，而是一套完整的软件研发方法论，
+ 
+ **P0：总体架构设计** — In Review（待评审）
+ 
+-> 状态说明：架构设计工作已完成，交付物已创建，正在等待 ChatGPT 评审验收。P0-002 的一致性收敛已完成。未经正式评审通过前，不得标记为 Accepted。
++> 状态说明：架构设计工作已完成，交付物已创建，正在等待 ChatGPT 评审验收。P0-002 一致性收敛与 P0-003 最终收敛已完成。未经正式评审通过前，不得标记为 Accepted。
+ 
+ ## 权威文档
+ 
+diff --git "a/docs/P0-\344\272\244\344\273\230\346\212\245\345\221\212.md" "b/docs/P0-\344\272\244\344\273\230\346\212\245\345\221\212.md"
+index ac9975f..5c37071 100644
+--- "a/docs/P0-\344\272\244\344\273\230\346\212\245\345\221\212.md"
++++ "b/docs/P0-\344\272\244\344\273\230\346\212\245\345\221\212.md"
+@@ -84,6 +84,18 @@ P0-002 在 P0-001 基础上完成一致性收敛：
+ 
+ 详见 `docs/reports/2026-11-20-P0-002-架构整改报告.md`。
+ 
++### 1.7 P0-003 最终架构收敛
++
++P0-003 关闭 P0-002 复审遗留问题：
++
++- 简单修改 Workflow 增加独立 Code Review，强制 G4 AND G5
++- R0–R4 权限口径统一，明确 G6 与 SA 边界
++- Task Context 状态机补全正常/审批/异常/终止路径
++- G6 统一为生产部署动作之前的授权门禁，部署后验证独立
++- P0-002 报告补充提交 `1829775` 与远程状态
++
++详见 `docs/reports/2026-11-20-P0-003-最终架构收敛整改报告.md`。
++
+ ---
+ 
+ ## 二、目录结构
+@@ -313,6 +325,7 @@ P0 阶段的设计工作已完成，交付物已创建，建立了完整的文
+ - P0-P7 路线图
+ - 风险和问题清单
+ - P0-002 架构一致性整改报告
++- P0-003 最终架构收敛整改报告
+ 
+ **下一步：**
+ 等待用户评审和决策，确认后进入 P1 阶段。
+diff --git a/docs/architecture/module-architecture.md b/docs/architecture/module-architecture.md
+index dbd6780..45e6df3 100644
+--- a/docs/architecture/module-architecture.md
++++ b/docs/architecture/module-architecture.md
+@@ -81,10 +81,20 @@ coding ────────────────┐
+ ### 简单修改（L1）
+ 
+ ```text
+-coding → testing/automated checks → (G4/G5 简化) → end
++coding ────────────────┐
++    │                   │
++    ├── code-review ────┤
++    │   (G4)            │
++    └── testing ────────┤
++        (G5)            │
++                        ▼
++                 quality gate
++                 (G4 AND G5)
++                        ↓
++                       end
+ ```
+ 
+-简单修改允许省略 requirements/analysis/design，但仍需必要的代码检查与验证；不得跳过安全约束。
++简单修改允许省略 requirements/analysis/design，但必须包含独立 Code Review（简化 G4）和必要测试（简化 G5）；两者可并行，质量门禁为 G4 AND G5。纯文档变更 G4 可 N/A，任何代码变更不得跳过 G4。
+ 
+ ### Bug 修复（L2）
+ 
+diff --git a/docs/architecture/orchestration-architecture.md b/docs/architecture/orchestration-architecture.md
+index 54436bc..a8211e1 100644
+--- a/docs/architecture/orchestration-architecture.md
++++ b/docs/architecture/orchestration-architecture.md
+@@ -121,7 +121,7 @@ routing_rules:
+ | `retry` | `{max, backoff}`；默认最多 3 次，指数退避 |
+ | `timeout_seconds` | 节点超时；超时按失败处理 |
+ | `approval` | `{gate, pause, resume}`；`gate` 取 G1–G6，暂停等待显式批准 |
+-| `gate` | 节点后置门禁（G1–G6）；语义见 ADR-006 |
++| `gate` | 节点关联门禁（G1–G6）；G1–G5 在节点产出后检查，G6 在生产部署动作前检查；语义见 ADR-006 |
+ | `artifacts` | 该节点必须产出的产物清单 |
+ 
+ ### 3.2 基础 DAG（功能开发）
+@@ -213,7 +213,7 @@ nodes:
+     type: skill
+     skill: deployment
+     depends_on: [quality_gate]
+-    gate: G6
++    gate: G6                 # G6 在部署动作前检查；不是部署后验证
+     condition: "deployment_requested == true"
+     on_success: verification
+     on_failure: rollback
+@@ -314,17 +314,43 @@ nodes:
+     skill: coding
+     outputs: [implementation]
+ 
+-  - id: checks
+-    type: check
++  - id: code_review
++    type: skill
++    skill: code-review
+     depends_on: [coding]
+-    checks: [lint, typecheck, focused-tests]
+-    on_failure: coding
++    gate: G4
++    parallel_group: quality
++    outputs: [review-report]
++
++  - id: testing
++    type: skill
++    skill: testing
++    depends_on: [coding]
++    gate: G5
++    parallel_group: quality
++    outputs: [test-report]
++
++  - id: quality_gate
++    type: gate
++    depends_on: [code_review, testing]
++    requires: [G4, G5]
++    on_failure:
++      review_severe: coding
++      review_minor: coding
++      testing_failed: coding
++    on_success: end
+ 
+   - id: end
+     type: end
+ ```
+ 
+-简单修改允许省略需求/分析/设计，但仍需必要的自动检查与验证；不得绕过安全约束。G4/G5 可以使用简化版，但必须有记录。
++简单修改允许省略需求/分析/设计，但必须包含：
++
++- **独立 Code Review（简化 G4）**：Reviewer 必须与代码作者独立；作者自审、Lint、Typecheck 均不能替代独立 Review。
++- **必要测试（简化 G5）**：至少执行与变更相关的聚焦测试/检查。
++- 两者可以并行，但质量门禁必须是 **G4 AND G5**；Review 失败返回 coding 修复后重新 Review。
++- 纯文档变更可将 G4 标记为 N/A；任何代码变更不得跳过 G4。
++- 不得因为任务简单而绕过安全约束。
+ 
+ ### 3.6 失败、重试、超时与审批
+ 
+@@ -372,13 +398,15 @@ node_states:
+ | G3 | coding 之前 | 开发计划确认 |
+ | G4 | code-review 之后 | 代码质量 |
+ | G5 | testing 之后 | 测试验收 |
+-| G6 | deployment 之前/之后 | 部署授权与验证 |
++| G6 | 生产部署动作之前 | 部署授权（不含部署后验证） |
++
++> **G6 位置：** G6 必须在生产部署动作发生**之前**通过。部署后的健康检查/冒烟/验收属于 **Deployment Verification**，不是 G6，也不能替代 G6。非生产环境是否需要审批按权限模型决定，不使用 G6。
+ 
+ ## 5. 任务类型与流程
+ 
+ | 任务类型 | 复杂度 | 推荐 Workflow | 必需门禁 |
+ |----------|--------|---------------|----------|
+-| simple_change | L1 | simple-task | G4/G5 简化，安全约束不跳过 |
++| simple_change | L1 | simple-task | G4（简化，独立 Review 不跳过）、G5（简化）；安全约束不跳过 |
+ | bug_fix | L2 | bug-fix | G4、G5 |
+ | feature_dev | L2/L3 | feature-development | G1、G2、G3、G4、G5（部署时 G6） |
+ | refactoring | L3 | refactoring | G1、G2、G3、G4、G5（部署时 G6） |
+@@ -390,6 +418,8 @@ node_states:
+ 
+ - 创建者：Orchestration Engine 在任务入口创建 `task-id`；无编排引擎时由执行的 Agent 创建并记录 `created_by`。
+ - 维护者：Orchestration Engine 维护状态；ArtifactManager 维护产物索引。
++- 状态机：正常 `created → planned → executing → verifying → completed`；审批 `executing → awaiting_approval → approved → executing`，`rejected/timeout → aborted`；异常 `executing/verifying → failed/aborted`。权威定义见 [ADR-005](../decisions/ADR-005-task-context.md)。
++- 终止状态（`completed/failed/aborted`）不可恢复执行；重试需创建新 `task-id`，并通过 `parent-task-id` 指向原任务。
+ - 路径、归属、版本、并发、归档规则：见 [ADR-005](../decisions/ADR-005-task-context.md)。
+ - 本文件中的 `inputs` / `outputs` 均使用 ADR-005 的 Artifact 引用格式（路径 + 版本 + hash）。
+ 
+diff --git a/docs/architecture/security-architecture.md b/docs/architecture/security-architecture.md
+index dcc9492..6ec64e7 100644
+--- a/docs/architecture/security-architecture.md
++++ b/docs/architecture/security-architecture.md
+@@ -21,17 +21,32 @@ SDD 安全架构区分两套不同的控制机制：
+ 
+ | 级别 | 名称 | 允许的能力 | 典型工具 | 默认环境 |
+ |------|------|------------|----------|----------|
+-| **R0** | 只读 | 读取项目文件、查看状态、读取任务上下文 | read、ls、git status、sessions read | 任意（受路径边界限制） |
+-| **R1** | 编辑 | 在项目工作区内创建/修改文件，使用只读和受限编辑工具 | write、edit、apply patch | 开发/测试 |
+-| **R2** | 执行 | 执行测试、构建、格式化、只读查询等受控命令 | exec（允许列表）、测试运行器、git 读写 | 开发/测试 |
+-| **R3** | 管理 | 安装依赖、修改非生产环境配置、非生产部署、访问允许的外部网络 | package manager、docker、非生产 deploy、network allowlist | 开发/测试/预发布 |
+-| **R4** | 危险 | 删除重要数据、修改认证/权限、修改生产配置/数据库、生产部署、读取敏感凭证、高风险 Shell | 高危 exec、prod admin、secret read | 仅显式授权 |
++| **R0** | 只读 | 读取允许访问的项目文件、查看状态 | read、ls、git status、sessions read | 任意（受路径边界限制） |
++| **R1** | 普通写入 | 修改项目文件、生成文档 | write、edit、apply patch | 开发/测试 |
++| **R2** | 受控执行 | 运行测试、构建、格式化、受限脚本、只读查询 | exec（允许列表）、测试运行器、git 读写 | 开发/测试 |
++| **R3** | 高风险操作 | 部署、数据库迁移、外部网络写操作、非生产环境管理 | deploy、migration、network allowlist、package manager | 开发/测试/预发布；生产需额外授权 |
++| **R4** | 严重敏感操作 | 生产数据破坏性操作、敏感凭证读取、不可逆高危操作 | prod admin、secret read、高危 exec | 仅显式授权 |
++
++> 说明：R3 的“高风险操作”是任务书规定的风险类别名称；具体能力见示例列，不代表与其他级别的能力描述存在冲突。
++
++**统一约束：**
++
++1. **生产部署 = R3 + G6 + SA**（SA：显式人工授权）。
++2. **生产数据库破坏性操作 = R4 + SA**；涉及部署时还需 G6。
++3. **敏感凭证读取 = R4 + SA**；不得由 Agent 自行批准。
++4. **高风险 Shell 操作**按实际影响范围定为 R2/R3/R4：普通测试脚本 R2；部署/迁移 R3；不可逆或生产破坏 R4。
++5. **权限与审批分离**：R 级别决定能力上限，G1–G6/SA 决定单次放行。
++6. **G6 是质量与发布门禁，不是权限检查**；G6 通过不代表已获得 R3/R4 权限，反之亦然。
++7. **SA 是显式人工授权**，不得被自动化检查、门禁通过或 Agent 自行批准替代。
++8. **默认拒绝**未声明的权限。
++9. **不得通过降低任务复杂度绕过权限要求。**
+ 
+ ### 2.2 默认权限与最小权限
+ 
+ - **默认拒绝**：未明确授予的能力不可用。
+ - **最小权限**：Skill 只获得完成当前节点所需的最小级别；任务结束或节点完成后回收。
+ - **按阶段授予**：默认权限配置只是上限建议，实际授予由 Task Context 和安全策略共同决定。
++- **禁止绕过**：不得通过降低任务复杂度、拆分任务或新建会话绕过权限要求。
+ 
+ ```yaml
+ # 默认权限上限（不是自动授权）
+@@ -116,7 +131,7 @@ file_boundaries:
+ - **黑名单只是补充**：字符串黑名单（如 `rm -rf /`）不能作为完整安全边界；真正的边界是权限级别、沙箱、路径限制和审批。
+ - **禁止不可信拼接**：不得把用户输入直接拼进 shell 命令；使用参数化调用。
+ - **超时与并发**：节点有超时；并发进程有上限（建议 5 个，单 Skill 2 个）。
+-- **高风险命令**：删除、磁盘写入、权限修改、下载后执行等属于 R4，需显式安全授权。
++- **高风险命令**：删除、磁盘写入、权限修改、下载后执行等按实际影响范围定为 R2/R3/R4；不可逆或生产破坏为 R4，需 SA。
+ 
+ ### 4.2 网络权限
+ 
+@@ -131,7 +146,7 @@ file_boundaries:
+ |------|----------------|------|
+ | 开发（dev） | R0–R2，必要时 R3（非生产依赖/容器） | 生产凭证、生产数据 |
+ | 测试（test） | R0–R3，自动化测试、非生产部署 | 生产凭证、生产数据库写入 |
+-| 生产（prod） | 仅 deployment 节点、R3 + G6 + 显式授权 | coding/testing/analysis 直接访问生产 |
++| 生产（prod） | 仅 deployment 节点、R3 + G6 + SA | coding/testing/analysis 直接访问生产 |
+ 
+ - 生产凭证只在部署节点临时注入，不写入 Task Context，不落入日志。
+ - 不同环境的配置和凭证必须隔离；不得用同一凭证跨环境操作。
+@@ -142,7 +157,8 @@ file_boundaries:
+ 
+ - **权限**：能力上限，长期/按阶段授予。
+ - **审批**：单次操作放行，绑定具体操作、目标、环境和风险。
+-- 有 R3 权限不代表可以部署生产；部署生产仍需 G6 + 显式授权。
++- **G6 不是权限检查**：G6 是质量与发布门禁；通过 G6 不等于获得 R3/R4 权限，获得 R3/R4 也不等于已获 G6/SA。
++- 有 R3 权限不代表可以部署生产；生产部署仍需 G6 + SA。
+ - 通过审批不自动提升权限级别；需要更高权限时仍要单独申请。
+ 
+ ### 5.2 审批类型
+@@ -160,18 +176,19 @@ SA 必须绑定：操作、目标、环境、风险等级、有效期、批准
+ |------|----------|----------|----------|------|-----------|
+ | 低 | 写项目文件、运行只读查询 | R1 | 无需 | dev/test | 版本控制记录 |
+ | 中 | 安装依赖、运行测试/构建、访问 allowlist 外部 API | R2–R3 | 外部 API 需显式授权 | dev/test | 审计日志 |
+-| 高 | 修改认证/授权代码、修改生产配置、生产部署 | R2–R3 | G2/G4 + G6 + 显式授权（按阶段） | dev/test/prod | 审计 + 回滚方案 |
+-| 严重 | 删除重要数据、修改生产数据库、读取敏感凭证、高风险 Shell | R4 | G6（如涉及部署）+ 显式安全授权 + 安全审查 | prod/受限 | 备份 + 恢复演练 + 审计 |
++| 高 | 修改认证/授权代码、修改生产配置 | R2–R3 | G2/G4 + G6/SA（按阶段） | dev/test/prod | 审计 + 回滚方案 |
++| 高 | 生产部署 | R3 | G6 + SA | prod | 审计 + 回滚方案 |
++| 严重 | 删除生产数据、修改生产数据库、读取敏感凭证、高风险 Shell | R4 | SA + 安全审查；涉及部署时加 G6 | prod/受限 | 备份 + 恢复演练 + 审计 |
+ 
+ **高风险操作清单（必须显式处理，不能只依赖 G6）：**
+ 
+-1. 删除重要数据 — R4 + 显式授权 + 备份/恢复方案 + 审计。
++1. 删除重要数据 — R4 + SA + 备份/恢复方案 + 审计。
+ 2. 修改认证与权限逻辑 — R2 + G2 设计审查 + G4 代码审查 + 显式安全审查。
+-3. 修改生产配置 — R3 + G6 + 显式授权 + 配置备份。
+-4. 修改生产数据库 — R4 + G6 + 显式授权 + 备份/回滚。
+-5. 生产环境部署 — R3 + G6 + 显式授权 + 回滚方案。
+-6. 访问敏感凭证 — R4 + 显式授权 + 密钥管理服务；不得写入日志或上下文。
+-7. 执行高风险 Shell — R4 + 显式授权 + 沙箱/快照；禁止在宿主直接执行不可逆命令。
++3. 修改生产配置 — R3 + G6 + SA + 配置备份。
++4. 修改生产数据库 — R4 + SA + 备份/回滚；涉及部署时加 G6。
++5. 生产环境部署 — R3 + G6 + SA + 回滚方案。
++6. 访问敏感凭证 — R4 + SA + 密钥管理服务；不得写入日志或上下文。
++7. 执行高风险 Shell — R2/R3/R4 按影响范围 + 相应 SA/审计；禁止在宿主直接执行不可逆命令。
+ 
+ ### 5.4 审批流程
+ 
+diff --git a/docs/architecture/testing-architecture.md b/docs/architecture/testing-architecture.md
+index 6409ebd..f35457b 100644
+--- a/docs/architecture/testing-architecture.md
++++ b/docs/architecture/testing-architecture.md
+@@ -218,7 +218,8 @@ scenarios:
+     description: "简单样式修改"
+     trigger: "把按钮颜色改成蓝色"
+     expected_duration: "< 30s"
+-    expected_gates: ["G4（简化）", "G5（简化）"]
++    expected_gates: ["G4（简化，独立 Review）", "G5（简化）"]
++    review_required: "independent"
+     
+   bug-investigation:
+     description: "Bug 调查和修复"
+diff --git a/docs/decisions/ADR-003-orchestration.md b/docs/decisions/ADR-003-orchestration.md
+index 5b1e3d0..a67ad95 100644
+--- a/docs/decisions/ADR-003-orchestration.md
++++ b/docs/decisions/ADR-003-orchestration.md
+@@ -79,7 +79,7 @@
+ 
+ | 任务类型 | 复杂度 | 推荐工作流 | 必需门禁 |
+ |----------|--------|-----------|----------|
+-| simple_change | L1 | simple-task | G4/G5 简化，安全约束不跳过 |
++| simple_change | L1 | simple-task | G4（简化，独立 Review 不跳过）、G5（简化）；安全约束不跳过 |
+ | bug_fix | L2 | bug-fix | G4、G5 |
+ | feature_dev | L2/L3 | feature-development | G1、G2、G3、G4、G5（部署时 G6） |
+ | refactoring | L3 | refactoring | G1、G2、G3、G4、G5（部署时 G6） |
+@@ -117,3 +117,4 @@ Workflow 节点字段、失败路径、重试、超时和审批暂停/恢复语
+ ## 修订记录
+ 
+ - **2026-11-20（P0-002）**：明确编排引擎与 orchestration Skill 的边界；将 Review/Testing 定义为并行且共同满足质量门禁；Deployment 必须依赖 G4/G5；门禁规则统一引用 ADR-006；Workflow DAG 语义独立定义。
++- **2026-11-20（P0-003）**：简单修改 Workflow 增加独立 Code Review；G4 与 G5 并行且共同构成质量门禁；G6 在生产部署动作之前检查。
+diff --git a/docs/decisions/ADR-005-task-context.md b/docs/decisions/ADR-005-task-context.md
+index b440e52..59fd167 100644
+--- a/docs/decisions/ADR-005-task-context.md
++++ b/docs/decisions/ADR-005-task-context.md
+@@ -55,6 +55,7 @@ Task Context 是任务执行期间的统一上下文，至少包含：
+ | 字段 | 说明 |
+ |------|------|
+ | `task-id` | 任务唯一标识，格式 `task-YYYYMMDD-<short-uuid>` |
++| `parent-task-id` | 可选；重试实例或派生任务指向原任务 |
+ | `project-root` | 项目根目录（规范化绝对路径） |
+ | `task-type` | 任务类型（与 orchestration-architecture.md 一致） |
+ | `complexity` | L1 / L2 / L3 |
+@@ -74,16 +75,66 @@ Task Context 是任务执行期间的统一上下文，至少包含：
+ 
+ **状态机：**
+ 
++**正常流程（无需审批）：**
++
++```text
++created
++  ↓
++planned
++  ↓
++executing
++  │  （无需审批且节点完成）
++  ↓
++verifying
++  ↓
++completed
++```
++
++**审批流程：**
++
++```text
++executing
++  ↓
++awaiting_approval
++  ├── approved → executing（恢复原 current-stage）
++  ├── rejected → aborted
++  └── timeout  → aborted（原因 approval_timeout）
++```
++
++**异常流程：**
++
+ ```text
+-created → planned → executing → awaiting_approval → verifying → completed
+-                         │              │
+-                         ├──────────────┴──► failed
+-                         └──────────────────► aborted
++executing / verifying
++  ├── failed   （执行已发生但不可恢复）
++  └── aborted  （主动终止/审批拒绝/审批超时/策略停止）
+ ```
+ 
+-- `awaiting_approval` 只能由显式批准恢复；超时不等于批准。
+-- `failed` / `aborted` 保留已生成产物和失败原因。
+-- `completed` 后 Task Context 冻结。
++**状态转换表：**
++
++| From | To | 条件 | 说明 |
++|------|----|------|------|
++| created | planned | Task Context 初始化完成 | 尚未开始执行 |
++| planned | executing | Workflow 开始 | 进入当前节点 |
++| executing | verifying | 无需审批且节点完成 | 允许直接进入验证 |
++| executing | awaiting_approval | 触发审批条件（G 门禁/SA） | 暂停并保存 current-stage |
++| awaiting_approval | executing | 显式批准 | 恢复原 current-stage，不丢上下文 |
++| awaiting_approval | aborted | 显式拒绝 | 记录拒绝原因与审批记录 |
++| awaiting_approval | aborted | 审批超时 | 原因 `approval_timeout`；超时不等于批准 |
++| executing | failed | 不可恢复执行错误 | 保留产物与错误详情 |
++| verifying | failed | 验证不可恢复失败 | 保留产物与错误详情 |
++| executing / verifying | aborted | 用户取消或策略终止 | 记录终止原因 |
++| verifying | completed | 验证通过 | Task Context 冻结 |
++
++**规则：**
++
++1. 不需要审批的任务允许直接从 `executing` 进入 `verifying`；只有触发审批条件的任务才能进入 `awaiting_approval`。
++2. 审批通过后恢复**原 current-stage**，不得丢失 Task Context、Artifact 引用或审批记录。
++3. 审批拒绝的终止语义为 `aborted`；不可当作 `failed` 或继续执行。
++4. 审批超时的处理为 `aborted`（`approval_timeout`）；超时不得视为批准，也不得自动放行。
++5. `failed` 表示执行已尝试但不可恢复；`aborted` 表示主动终止、拒绝或策略停止。两者都必须保留原因和产物。
++6. 重试必须保留原任务与 Artifact 历史；重试在**新的 task-id** 下进行，并通过 `parent-task-id` 指向原任务（或作为明确的 retry 实例）。
++7. `completed` / `failed` / `aborted` 为终止状态，**禁止从终止状态直接恢复执行**；如需重新执行，创建新任务或新重试实例。
++8. Workflow 的节点状态（如 `awaiting_approval`）与 Task Context 的 `task-status` 同名但作用域不同：节点状态描述单个节点，`task-status` 描述整个任务；两者必须同步记录。
+ 
+ ### 2. Artifact
+ 
+@@ -176,3 +227,4 @@ artifacts/
+ ## 修订记录
+ 
+ - **2026-11-20（P0-002）**：补充 Task Context 字段与状态机、Artifact 归属/版本/来源、写入权限与并发、跨任务隔离与归档；明确 `platform-config` 只是引用，不混入平台配置；与安全架构的只读共享和写入隔离对齐。
++- **2026-11-20（P0-003）**：补全正常/审批/异常状态机；明确审批通过恢复原 current-stage、拒绝/超时终止、failed 与 aborted 区别、终止状态不可恢复、重试实例与新 `task-id`；新增 `parent-task-id`。
+diff --git a/docs/decisions/ADR-006-quality-gates.md b/docs/decisions/ADR-006-quality-gates.md
+index b92c91f..aa9cf42 100644
+--- a/docs/decisions/ADR-006-quality-gates.md
++++ b/docs/decisions/ADR-006-quality-gates.md
+@@ -126,20 +126,21 @@
+ 
+ ### 8. G6：部署授权
+ 
+-- **触发**：deployment 节点；生产环境变更。
++- **位置**：**生产部署动作之前**。G6 通过后才允许执行部署；部署后的健康检查/冒烟/验收属于 Deployment Verification，不是 G6，也不能替代 G6。
++- **触发**：生产部署动作；生产环境变更。
+ - **自动检查**：部署目标与环境；变更摘要；回滚方案；备份；监控/健康检查；G1–G5 记录；安全检查项。
+-- **人工审批**：所有生产部署必须人工授权；非生产部署可按策略自动，但必须记录。
+-- **允许跳过**：无部署任务时 G6 记为 N/A；非生产开发环境部署可按策略简化。
++- **人工审批**：所有生产部署必须人工授权；非生产环境是否需要审批按权限模型决定，不使用 G6。
++- **允许跳过**：无部署任务时 G6 记为 N/A；非生产开发环境审批按权限模型处理，不标记为 G6。
+ - **不允许跳过**：生产环境、数据迁移、认证/安全变更、破坏性变更。
+ - **失败回退**：中止部署；如已部分执行，执行回滚并记录事件；不得把失败标记为成功。
+-- **通过状态**：`deployment_authorized` → 部署执行 → 验证通过后 `completed`。
+-- **审计**：部署记录、审批人、提交/产物 hash、回滚结果。
++- **通过状态**：`deployment_authorized` → 执行部署 → **Deployment Verification** → 验证通过后 `completed`。
++- **审计**：部署记录、审批人、提交/产物 hash、回滚结果；部署后验证单独记录。
+ 
+ ### 9. 任务类型与门禁
+ 
+ | 场景 | 必需门禁 | 按需门禁 | 说明 |
+ |------|----------|----------|------|
+-| 简单修改（L1） | G4（简化）、G5（简化） | G1/G2/G3 可简化；G6 如部署 | 不得跳过安全约束 |
++| 简单修改（L1） | G4（简化，独立 Review 不跳过）、G5（简化） | G1/G2/G3 可简化；G6 如部署 | 不得跳过安全约束；纯文档变更 G4 可 N/A |
+ | Bug 修复（L2） | G4、G5 | G1/G2/G3 视范围；G6 如部署 | Analysis → Coding → Testing → Review |
+ | 功能开发（L2/L3） | G1、G2、G3、G4、G5 | G6 如部署 | 完整流程 |
+ | 系统重构（L3） | G1、G2、G3、G4、G5 | G6 如部署 | 完整设计、Review、测试 |
+@@ -158,7 +159,7 @@ Coding ──────────┤                    ├── quality ga
+ - G4 与 G5 可并行，但**不能互相替代**；quality gate 必须两者都通过。
+ - Review 严重问题 → coding；Testing 失败 → 按缺陷类型回退。
+ - G6 不得绕过 quality gate；生产部署必须人工授权。
+-- 简单任务可简化 G1–G3，但不能绕过安全检查。
++- 简单任务可简化 G1–G3，但 G4（独立 Review）与 G5（测试）不得跳过；纯文档变更 G4 可 N/A。
+ 
+ ### 11. 状态变化与审计
+ 
+@@ -222,3 +223,4 @@ builder_check:
+ ## 修订记录
+ 
+ - **2026-11-20（P0-002）**：将 G1–G6 确立为唯一权威定义；补充自动检查、人工审批、跳过/不可跳过、失败回退、通过状态和审计要求；明确 G4 与 G5 独立且共同构成质量门禁；明确 G6 依赖质量门禁；补充任务类型与门禁映射。
++- **2026-11-20（P0-003）**：明确简单修改必须执行独立 Review（G4 不得跳过）；G6 统一为生产部署动作之前的授权门禁，部署后验证独立且不能替代 G6；非生产审批按权限模型处理，不使用 G6。
+diff --git "a/docs/reports/2026-11-20-P0-002-\346\236\266\346\236\204\346\225\264\346\224\271\346\212\245\345\221\212.md" "b/docs/reports/2026-11-20-P0-002-\346\236\266\346\236\204\346\225\264\346\224\271\346\212\245\345\221\212.md"
+index af936d3..5d15ae8 100644
+--- "a/docs/reports/2026-11-20-P0-002-\346\236\266\346\236\204\346\225\264\346\224\271\346\212\245\345\221\212.md"
++++ "b/docs/reports/2026-11-20-P0-002-\346\236\266\346\236\204\346\225\264\346\224\271\346\212\245\345\221\212.md"
+@@ -13,6 +13,8 @@
+ | 完成时间 | 2026-11-20 |
+ 
+ > 本报告描述的是**设计收敛**，不代表 Orchestration、Workflow、安全控制或平台适配已经实现。P0 未创建任何 Skill、Workflow 引擎或 Tool 插件，未提交 Git。
++>
++> **后续状态：** 本报告整改完成后的 20 个文件已提交为 `1829775`；表头 `e702dad` 是整改开始时的基线，不是当前 HEAD。详见第十一节。
+ 
+ ---
+ 
+@@ -348,7 +350,9 @@ P0-002 针对 ChatGPT 评审提出的 8 类架构一致性问题，在不推翻
+ 
+ ---
+ 
+-## 九、Git 修改统计
++## 九、Git 修改统计（P0-002 整改完成时）
++
++> 本节记录 P0-002 整改完成时（提交前）的工作区状态；后续提交与远程状态见第十一节。
+ 
+ **当前分支：** `master`
+ **基线：** `e702dad`
+@@ -386,4 +390,16 @@ P0-002 针对 ChatGPT 评审提出的 8 类架构一致性问题，在不推翻
+ 
+ ---
+ 
++## 十一、P0-003 补充记录：提交与远程状态
++
++> 本节为 P0-003 复审补充记录，不修改 P0-002 原执行时间、验证结果或历史结论。
++
++- 2026-11-20：P0-002 整改的 20 个文件已提交为 `1829775`（`feat: P0-002 架构一致性整改`）。
++- 分支已从 `master` 重命名为 `main`，并推送到 `origin/main`。
++- 当前最新状态：`main` = `origin/main` = `1829775`。
++- P0-002 整改报告已随该提交入库；第九节描述的“未提交”是整改完成时的历史快照，不是当前状态。
++- P0 状态仍为 **In Review**；ChatGPT 尚未完成最终验收，本补充记录不构成验收结论。
++
++---
++
+ *报告生成：Claude Code · 2026-11-20 · 基于实际文件、链接检查与 Git 工作区状态*
+diff --git a/docs/roadmap/roadmap.md b/docs/roadmap/roadmap.md
+index b92887a..11fe6df 100644
+--- a/docs/roadmap/roadmap.md
++++ b/docs/roadmap/roadmap.md
+@@ -31,6 +31,7 @@
+ - [x] 自检与验收报告
+ - [x] 整改报告编写
+ - [x] P0-002 架构一致性整改
++- [x] P0-003 最终架构收敛
+ 
+ ### P0-002 架构一致性整改
+ 
+@@ -44,12 +45,22 @@
+ - [x] 文档一致性、链接与 CLI 示例修正
+ - [x] 生成 P0-002 整改报告
+ 
++### P0-003 最终架构收敛
++
++- [x] 简单修改 Workflow 增加独立 Review，G4 AND G5
++- [x] 统一 R0–R4 权限口径与 G6/SA 边界
++- [x] 补全 Task Context 正常/审批/异常状态机
++- [x] G6 统一为生产部署动作之前的授权门禁
++- [x] 补充 P0-002 报告提交 1829775 记录
++- [x] 生成 P0-003 整改报告
++
+ ### 交付物
+ - [docs/architecture/](../architecture/) — 架构设计文档
+ - [docs/decisions/](../decisions/) — 架构决策记录
+ - [docs/roadmap/](./) — 项目路线图
+ - [docs/risks-and-questions.md](../risks-and-questions.md) — 风险与待确认事项
+ - [docs/reports/2026-11-20-P0-002-架构整改报告.md](../reports/2026-11-20-P0-002-架构整改报告.md) — P0-002 整改报告
++- [docs/reports/2026-11-20-P0-003-最终架构收敛整改报告.md](../reports/2026-11-20-P0-003-最终架构收敛整改报告.md) — P0-003 整改报告
+ 
+ ### 依赖关系
+ - P1 依赖 P0 完成
+@@ -307,9 +318,10 @@
+ - 路线图与风险清单
+ - 自检与交付报告、P0-001 整改报告
+ - P0-002 架构一致性整改及报告
++- P0-003 最终架构收敛及报告
+ 
+ 待评审：
+-- ChatGPT 架构评审与验收
++- ChatGPT 架构评审与最终验收
+ - 6 个待决策问题的答复
+ 
+ 未完成（后续阶段）：

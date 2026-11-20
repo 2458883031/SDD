@@ -218,7 +218,8 @@ scenarios:
     description: "简单样式修改"
     trigger: "把按钮颜色改成蓝色"
     expected_duration: "< 30s"
-    expected_gates: ["G4（简化）", "G5（简化）"]
+    expected_gates: ["G4（简化，独立 Review）", "G5（简化）"]
+    review_required: "independent"
     
   bug-investigation:
     description: "Bug 调查和修复"
