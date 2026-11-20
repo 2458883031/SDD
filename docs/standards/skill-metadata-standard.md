@@ -74,7 +74,9 @@ dependencies:
 compatibility:
   requires_capabilities:
     - skill-discovery
-    - tool-port
+    - skill-metadata
+    - tool-invocation
+    - context-port
     - artifact-port
   optional_capabilities:
     - approval-port
@@ -96,6 +98,9 @@ changelog: CHANGELOG.md
 | `compatibility.requires_capabilities` | 否 | 需要的核心端口能力，不是平台名 |
 | `compatibility.optional_capabilities` | 否 | 可选能力；缺失时可降级 |
 | `changelog` | 否 | 变更记录路径 |
+
+- `compatibility.requires_capabilities` 必须使用 [Capability Registry](../architecture/platform-adapter-architecture.md#21-capability-registry统一能力标识) 的唯一标识；不得自造别名。
+- `artifact-port` 的 Artifact 读写由 ContextPort 提供，不新增端口。
 
 **禁止：**
 
@@ -151,6 +156,13 @@ skills:
     invocation:
       mode: native
       tools: [read, write]
+    capabilities:
+      skill-discovery: true
+      skill-metadata: true
+      tool-invocation: true
+      context-port: true
+      artifact-port: true
+      approval-port: false
     approval:
       mode: platform
     context:

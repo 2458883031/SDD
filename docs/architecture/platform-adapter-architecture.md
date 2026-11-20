@@ -42,6 +42,27 @@
 
 端口接口的权威语义在 [system-architecture.md §2–§3](./system-architecture.md)；本文件只定义适配层实现要求。
 
+### 2.1 Capability Registry（统一能力标识）
+
+Skill、`skill.yaml`、平台元数据和适配器必须使用以下唯一标识。不得为同一能力新增别名或新抽象端口。
+
+| Capability ID | 映射端口 | 默认要求 | 缺失行为 |
+|---------------|----------|----------|----------|
+| `skill-discovery` | DiscoveryPort | required | `unsupported`/`not_ready` |
+| `skill-metadata` | MetadataPort | required | `not_ready`；核心字段无法映射 |
+| `tool-invocation` | ToolPort | required | 必需工具缺失 → `blocked`；不得用更高权限工具替代 |
+| `context-port` | ContextPort | required | 无法注入 Task Context → `blocked` |
+| `artifact-port` | ContextPort（Artifact 读写由 ContextPort 提供，不新增端口） | required | 无法读写产物 → `blocked`；只读降级需显式声明 |
+| `approval-port` | ApprovalPort | optional（需要审批的 Skill 视为 required） | 需要审批的操作 → `blocked`，不得自动批准 |
+| `result-port` | ResultPort | required | 无法回传结果 → `failed` |
+
+- `artifact-port` **不是新端口**：Artifact 的读写沿用 ContextPort，并遵守 ADR-005。
+- `skill.yaml` 的 `compatibility.requires_capabilities` 只能使用本表 ID。
+- `requirements-clarity` 的文件写入通过 `artifact-port`（ContextPort）完成，不直接写平台私有路径。
+- 平台元数据的 `capabilities` 块必须声明平台适配器是否提供每个能力；未声明视为 Unknown。
+- 核心 `requires.tools` 表示工具类别，映射到 `tool-invocation`；`requires.permissions` 映射到安全控制，不是 capability。
+- 缺失能力时禁止静默改变核心规则；按上表标记 `not_ready`/`blocked`/降级。
+
 ---
 
 ## 3. 适配器接口

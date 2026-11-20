@@ -12,7 +12,9 @@ dependencies:
 compatibility:
   requires_capabilities:
     - skill-discovery
-    - tool-port
+    - skill-metadata
+    - tool-invocation
+    - context-port
     - artifact-port
   optional_capabilities:
     - approval-port

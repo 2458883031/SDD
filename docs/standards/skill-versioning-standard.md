@@ -73,13 +73,17 @@ dependencies:
 compatibility:
   requires_capabilities:
     - skill-discovery
-    - tool-port
+    - skill-metadata
+    - tool-invocation
+    - context-port
     - artifact-port
+  optional_capabilities:
+    - approval-port
   optional_capabilities:
     - approval-port
 ```
 
-- 这是**能力依赖**，不是平台名单。
+- 这是**能力依赖**，不是平台名单；能力 ID 必须来自 [Capability Registry](../architecture/platform-adapter-architecture.md#21-capability-registry统一能力标识)。
 - 适配器负责判断平台是否具备能力；缺失时降级或 `not_ready`。
 - 不得在核心规范中写“仅 OpenClaw 可用”之类的平台绑定。
 

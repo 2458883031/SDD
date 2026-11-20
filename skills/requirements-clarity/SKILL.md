@@ -70,13 +70,15 @@ requires:
 
 ## 输出
 
-遵循 `schemas/output.schema.json`：
+遵循 `schemas/output.schema.json` 的统一信封：
 
 - `status`: `ok | needs_input | needs_approval | blocked | failed`
-- `requirements`: `goal/scope/constraints/acceptance_criteria/non_goals`
-- `questions`: 待确认问题
-- `artifact_refs`: 需求文档产物引用（如生成）
-- `errors`: 标准错误对象
+- `data`: 业务输出；`ok` 时包含完整 `requirements`，`needs_input` 时包含 `questions`（可含部分 `requirements`），`needs_approval` 时包含 `approval_request`，`blocked` 时包含 `blocked_reason`
+- `artifacts`: 需求文档产物引用（`path/version/sha256/type`）；文件写入通过 `artifact-port`（由 ContextPort 提供）
+- `errors`: 标准错误对象；`failed` 时至少一个
+- `evidence`: 测试/审查/命令/产物证据引用
+
+不得使用已废弃的 `artifact_refs` 字段。
 
 ## 异常处理
 
@@ -92,6 +94,7 @@ requires:
 ## 安全约束
 
 - R0：读取允许的项目文件；R1：写入需求产物。
+- 需求产物写入通过 `artifact-port`（由 ContextPort 提供），不直接写平台私有路径。
 - 只调用 `file-read` 和受限写入；不调用 Shell、网络或生产工具。
 - 不读取敏感凭证、其他项目或越界路径。
 - 涉及安全敏感需求时标记 G2/G4/SA 建议，不自行批准。

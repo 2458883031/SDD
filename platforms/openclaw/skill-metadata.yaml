@@ -18,6 +18,13 @@ skills:
     invocation:
       mode: native
       tools: [read, write]
+    capabilities:
+      skill-discovery: true
+      skill-metadata: true
+      tool-invocation: true
+      context-port: true
+      artifact-port: true
+      approval-port: false
     approval:
       mode: platform
     context:

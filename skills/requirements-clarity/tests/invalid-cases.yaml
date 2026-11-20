@@ -1,0 +1,16 @@
+skill: requirements-clarity
+description: "Inputs that MUST be rejected by input.schema.json"
+invalid_cases:
+  - name: empty-request
+    input:
+      request: ""
+    expect_schema_error: true
+  - name: wrong-request-type
+    input:
+      request: 123
+    expect_schema_error: true
+  - name: unknown-field
+    input:
+      request: "有效需求"
+      unexpected_field: true
+    expect_schema_error: true

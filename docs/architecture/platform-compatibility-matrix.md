@@ -30,8 +30,11 @@
 |------|----------|-------------|-------|--------|------------|----------|
 | SKILL.md 格式 | Documented | Documented | Documented | Documented | Documented | Documented |
 | Skill 发现 | Documented | Documented | Documented | Documented | Documented | Documented |
-| 核心元数据（name/description/requires） | Documented | Documented | Documented | Documented | Documented | Documented |
-| 平台元数据扩展 | Documented | Documented | Documented | Documented | Documented | Documented |
+| `name` / `description` 原生 Frontmatter | Documented | Documented | Documented | Documented | Documented | Documented |
+| `requires` 原生 Frontmatter | Unknown | Unknown | Unknown | Unknown | Unknown | Unknown |
+| SDD Adapter 解析 `requires`（设计） | Assumed | Assumed | Assumed | Assumed | Assumed | Assumed |
+| 平台原生 metadata 扩展 | Documented | Documented | Documented | Documented | Documented | Documented |
+| SDD 平台 metadata 映射（设计） | Assumed | Assumed | Assumed | Assumed | Assumed | Assumed |
 | references/ 按需加载 | Documented | Documented | Documented | Documented | Documented | Unknown |
 | scripts/ 辅助脚本 | Documented | Documented | Documented | Documented | Documented | Unknown |
 | Tool 调用 | Documented | Documented | Documented | Documented | Documented | Documented |
@@ -40,15 +43,27 @@
 | 上下文/产物传递 | Documented | Documented | Documented | Unknown | Unknown | Unknown |
 | 生命周期/安装 | Documented | Documented | Documented | Documented | Documented | Documented |
 | 运行环境限制 | Documented | Documented | Unknown | Unknown | Unknown | Unknown |
+| SDD 全栈语义验证 | Unknown | Unknown | Unknown | Unknown | Unknown | Unknown |
+
+> **关键区分：**
+>
+> - **平台原生 Frontmatter**：各平台官方文档定义的 `name`/`description` 等字段。
+> - **平台原生 metadata 扩展**：OpenClaw `metadata.openclaw`、Claude Code `allowed-tools`、Codex `agents/openai.yaml`、Cursor Rules/插件、Gemini 扩展、OpenCode metadata/permission 等。
+> - **SDD Adapter 解析**：当前**未实现**的适配器设计能力；标记 Assumed，不代表平台原生支持。
+> - `requires` 是 SDD 核心字段；没有平台官方文档明确把顶层 `requires` 作为原生 Frontmatter。OpenClaw 使用 `metadata.openclaw` 做 gating，不等于顶层 `requires` 原生支持。
+> - SDD 全栈语义仍为 Unknown；不得因为平台支持 `SKILL.md` 就写成 Verified。
 
 ### 2.2 说明
 
-- **OpenClaw**：官方文档定义了 SKILL.md、`metadata.openclaw`、发现顺序、工具和安装；`openclaw skills list` 实际运行成功。但 SDD 触发语义、SDD 平台元数据映射、审批和完整 Workflow 未实测。
-- **Claude Code**：官方文档定义 `.claude/skills`、SKILL.md、`allowed-tools`、渐进披露；未在 SDD 语义下实测。
-- **Codex**：官方文档定义 `.agents/skills`、SKILL.md、`agents/openai.yaml`、技能发现和工具依赖；权限/审批/运行环境证据不足。
+- **OpenClaw**：官方文档定义 SKILL.md、`metadata.openclaw`、发现顺序、工具和安装；顶层 `requires` 不是官方原生字段；gating 使用 `metadata.openclaw`。`openclaw skills list` 实际运行成功；SDD 触发语义/映射/审批/Workflow 未实测。
+- **Claude Code**：官方文档定义 `.claude/skills`、SKILL.md、`allowed-tools`、渐进披露；`allowed-tools` 是平台原生扩展，不是 SDD 核心 `requires`；未在 SDD 语义下实测。
+- **Codex**：官方文档定义 `.agents/skills`、SKILL.md、`agents/openai.yaml`、技能发现和工具依赖；`agents/openai.yaml` 是平台扩展；SDD `requires` 解析未实现。
 - **Cursor**：官方文档同时定义 Skills 与 Rules；Skills 支持 SKILL.md、发现路径、插件；权限/审批未验证。
-- **Gemini CLI**：官方文档定义 skills、扩展内 skills、发现层级和激活同意；权限/上下文证据不足。
+- **Gemini CLI**：官方文档定义 skills、扩展内 skills、发现层级和激活同意；扩展 metadata 是平台原生机制；SDD `requires` 解析未实现。
 - **OpenCode**：官方文档定义 `.opencode/skills`、`.claude/skills`、`.agents/skills`、frontmatter 和 `permission` allow/deny/ask；references/scripts/上下文证据不足。
+- **SDD Adapter 解析**：所有平台的 Adapter 解析标记为 Assumed，因为 P1-001 未实现任何适配器；不得把该设计能力写成平台原生能力。
+
+> **状态来源：** Documented 均来自 §4 对应平台官方文档；Assumed 为 Adapter 设计推断；Unknown 表示没有足够证据；Verified 仅用于 §3 的 OpenClaw CLI 实测项。
 
 ---
 

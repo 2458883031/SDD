@@ -74,43 +74,31 @@
 
 ### 3.2 输出 Schema 示例
 
+所有结构化 Skill 使用统一输出信封：
+
 ```json
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://sdd.local/skills/requirements-clarity/output.schema.json",
-  "title": "RequirementsClarityOutput",
+  "title": "SkillOutputEnvelope",
   "type": "object",
   "additionalProperties": false,
-  "required": ["status", "requirements"],
+  "required": ["status", "artifacts", "errors", "evidence"],
   "properties": {
     "status": {
       "type": "string",
-      "enum": ["ok", "needs_input", "blocked"]
+      "enum": ["ok", "needs_input", "needs_approval", "blocked", "failed"]
     },
-    "requirements": {
-      "type": "object",
-      "required": ["goal", "scope", "constraints", "acceptance_criteria", "non_goals"],
-      "properties": {
-        "goal": { "type": "string" },
-        "scope": { "type": "array", "items": { "type": "string" } },
-        "constraints": { "type": "array", "items": { "type": "string" } },
-        "acceptance_criteria": { "type": "array", "items": { "type": "string" } },
-        "non_goals": { "type": "array", "items": { "type": "string" } }
-      }
-    },
-    "questions": {
-      "type": "array",
-      "items": { "type": "string" },
-      "default": []
-    },
-    "artifact_refs": {
-      "type": "array",
-      "items": { "type": "object" },
-      "default": []
-    }
+    "data": { "type": "object" },
+    "artifacts": { "type": "array" },
+    "errors": { "type": "array" },
+    "evidence": { "type": "array" }
   }
 }
 ```
+
+- `data` 的具体结构由各 Skill 的 `output.schema.json` 通过状态条件约束（见 §5.3）。
+- `artifacts` 是统一产物引用字段；不再使用 `artifact_refs`。
+- 完整可执行 Schema 见 `skills/requirements-clarity/schemas/output.schema.json`。
 
 ---
 
@@ -136,9 +124,9 @@
 
 ## 5. 输出与错误结果
 
-### 5.1 统一输出信封
+### 5.1 统一输出信封（权威定义）
 
-建议所有结构化 Skill 输出包含：
+**所有 Skill 必须使用以下输出信封；本文件是信封的权威定义。**
 
 ```json
 {
@@ -150,15 +138,31 @@
 }
 ```
 
-| 字段 | 说明 |
-|------|------|
-| `status` | `ok` / `needs_input` / `needs_approval` / `blocked` / `failed` |
-| `data` | Skill 的业务输出，遵循 `output.schema.json` |
-| `artifacts` | Artifact 引用：`{path, version, sha256, type}` |
-| `errors` | 标准错误对象数组 |
-| `evidence` | 测试/审查/执行证据引用 |
+| 字段 | 必需 | 说明 |
+|------|------|------|
+| `status` | 是 | `ok` / `needs_input` / `needs_approval` / `blocked` / `failed` |
+| `data` | 视状态 | Skill 业务输出；结构由 `output.schema.json` 按状态约束 |
+| `artifacts` | 是 | 本次产生的 Artifact 引用：`{path, version, sha256, type}` |
+| `errors` | 是 | 标准错误对象数组；`failed` 时至少一个 |
+| `evidence` | 是 | 证据引用：`{type, ref, sha256?, note?}` |
 
-### 5.2 错误对象
+- `artifacts` 是**唯一**的产物字段；`artifact_refs` 已废弃，不得在新 Skill 中使用。
+- `evidence` 用于引用测试/审查/命令/产物证据，不替代 `artifacts`；`type` 取 `test|review|command|artifact|other`。
+- `data` 不是任意对象：各 Skill 必须通过 `output.schema.json` 给出状态相关结构。
+
+### 5.2 状态与合法输出
+
+| 状态 | `data` 要求 | `errors` 要求 | 说明 |
+|------|-------------|----------------|------|
+| `ok` | 必须包含完整业务输出（如 `requirements`） | 空 | 成功完成 |
+| `needs_input` | 必须包含 `questions`（至少 1 条）；`requirements` 可为部分对象，**不得**强制伪造 `acceptance_criteria` | 可空 | 需要用户补充信息 |
+| `needs_approval` | 必须包含 `approval_request`（`gate_or_sa`、`reason`、`impact`、`rollback`）；`requirements` 可为部分对象 | 可空 | 需要 G/SA 审批 |
+| `blocked` | 必须包含 `blocked_reason`；`requirements` 可为部分对象 | 可空 | 缺少权限/上下文/依赖 |
+| `failed` | 可省略或只含诊断信息 | 至少 1 个错误 | 执行失败；不得强制成功状态的 requirements |
+
+`requirements` 的部分对象允许字段：`goal`、`scope`、`constraints`、`non_goals`；`acceptance_criteria` 仅在已能定义时出现。
+
+### 5.3 错误对象
 
 ```json
 {

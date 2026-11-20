@@ -188,15 +188,21 @@ python tests/unit/requirements-clarity/validate_reference_skill.py
 
 ```text
 REFERENCE SKILL VALIDATION PASSED
-cases=6 schemas=2 examples=2 platform_entries=1
+structure=passed schema=Draft202012 examples_in=1 examples_out=5
+cases_input_validated=6 invalid_cases_rejected=3
+semver_valid=6 semver_invalid=6
+runtime_behavior=NOT_EXECUTED platform_entries=1
 ```
 
 覆盖：
 
 - SKILL.md Frontmatter 仅 name/description/requires；
 - `skill.yaml` SemVer/status/schema_version；
-- 输入/输出 JSON Schema 合法；
-- 示例输入/输出通过 Schema 子集校验；
+- 输入/输出 JSON Schema 合法（Draft 2020-12）；
+- 全部 example-input/example-output 通过 Draft 2020-12 校验（5 个状态输出示例）；
+- tests/cases.yaml 中 6 个输入全部通过 input.schema.json；3 个 invalid 输入被拒绝；
+- SemVer 正反向测试 6/6；
+- 平台元数据条目完整；
 - 6 个测试用例（正常、缺失验收标准、冲突、安全敏感、空输入、不可验证词）；
 - 平台元数据条目完整。
 
@@ -235,7 +241,7 @@ cases=6 schemas=2 examples=2 platform_entries=1
   - 目录、IO Schema、执行责任、安全标准、平台证据等级、版本/生命周期、测试分级均完整；
   - 六平台清单一致，未把 Documented/Assumed/Unknown 写成 Verified；
   - 未批量创建 Skill，未实现运行时组件，未修改 P0 决策。
-- **Minor：** 参考 Skill 的测试脚本是结构/契约测试，不是运行时安全测试。Claude Code 复核：成立；本报告 §6.2 已明确未做运行时/安全测试，§7 也标注为“参考 Skill 结构/契约测试”。该限制属于 P2/P5/P7 范围。
+- **Minor：** 参考 Skill 的测试脚本是结构/元数据 + Draft 2020-12 Schema + SemVer 测试，不是运行时安全测试。Claude Code 复核：成立；本报告 §6.2 已明确未做运行时/安全测试，§7 也标注为“参考 Skill 结构/契约测试”。该限制属于 P2/P5/P7 范围。
 - OpenClaw 未修改任何文件；其结论仅作为交叉检查输入，最终判断由 ChatGPT 复审决定。
 
 ---
