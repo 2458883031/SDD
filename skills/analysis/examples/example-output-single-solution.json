@@ -1,0 +1,390 @@
+{
+  "status": "ok",
+  "data": {
+    "analysis": {
+      "analysis_id": "AN-20261120-002",
+      "analysis_version": "0.1.0",
+      "created_at": "2026-11-20T15:00:00Z",
+      "source_requirements_ref": {
+        "path": "artifacts/task-20261120-an0002/requirements/requirements.md",
+        "version": 1,
+        "sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+        "type": "requirements"
+      },
+      "source_requirements_version": "0.2.0",
+      "source_refs": [
+        {
+          "path": "artifacts/task-20261120-an0002/requirements/requirements.md",
+          "version": 1,
+          "sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+          "type": "requirements"
+        }
+      ],
+      "problem_statement": {
+        "description": "文档列表需要按标题关键字搜索，并复用现有搜索索引。",
+        "goal": "为文档列表增加标题关键字搜索。",
+        "scope": [
+          "文档列表搜索框",
+          "查询接口增加关键字参数"
+        ],
+        "non_goals": [
+          "不新增全文检索服务"
+        ],
+        "constraints": [
+          "复用现有搜索索引"
+        ],
+        "known_conditions": [
+          "已有文档列表和搜索索引"
+        ]
+      },
+      "technical_context": {
+        "tech_stack": [
+          "TypeScript",
+          "Node.js",
+          "React",
+          "PostgreSQL"
+        ],
+        "system_structure": "前端文档列表调用文档查询服务，服务访问搜索索引。",
+        "external_systems": [],
+        "technical_dependencies": [
+          "文档查询服务",
+          "搜索索引"
+        ],
+        "data_environment": "dev/test 环境；不访问生产数据",
+        "runtime_environment": "Node.js 20 容器",
+        "known_limitations": [
+          "标题搜索只覆盖标题字段"
+        ],
+        "unknowns": []
+      },
+      "candidate_solutions": [
+        {
+          "solution_id": "SOL-A",
+          "name": "扩展现有文档搜索接口",
+          "description": "在现有文档查询接口增加标题关键字参数。",
+          "approach": "复用现有搜索索引，增加标题关键字过滤。",
+          "applicable_requirements": [
+            "FR-1"
+          ],
+          "prerequisites": [
+            "订单查询接口可扩展"
+          ],
+          "advantages": [
+            "改动小",
+            "复用现有搜索索引"
+          ],
+          "disadvantages": [
+            "只支持标题字段"
+          ],
+          "technical_complexity": "low",
+          "implementation_cost_estimate": {
+            "estimate": "2-3 人日",
+            "basis": "基于现有接口和前端组件估算",
+            "confidence": "medium"
+          },
+          "operational_cost_estimate": {
+            "estimate": "低",
+            "basis": "复用现有服务，无新增运行组件",
+            "confidence": "medium"
+          },
+          "performance_impact": "medium",
+          "security_impact": "low",
+          "maintainability": "medium",
+          "scalability": "medium",
+          "migration_impact": "low",
+          "compatibility_impact": "low",
+          "dependencies": [
+            "订单查询服务"
+          ],
+          "risks": [
+            "RISK-1",
+            "RISK-2"
+          ],
+          "evidence_refs": [
+            "docs/architecture/module-architecture.md",
+            "requirements:FR-1"
+          ],
+          "assumptions": [
+            "现有查询接口可安全扩展过滤参数"
+          ],
+          "unknowns": [
+            "大数据量索引效果未实测"
+          ]
+        }
+      ],
+      "feasibility_assessment": [
+        {
+          "area": "technical",
+          "assessment": "现有查询接口可扩展过滤参数。",
+          "status": "feasible",
+          "evidence_refs": [
+            "docs/architecture/module-architecture.md"
+          ],
+          "assumptions": [
+            "接口可安全增加参数"
+          ],
+          "unknowns": [],
+          "rationale": "已有查询服务和前端列表组件。"
+        },
+        {
+          "area": "resource",
+          "assessment": "方案 A 可在现有团队工作量内完成。",
+          "status": "feasible",
+          "evidence_refs": [],
+          "assumptions": [
+            "团队有 2-3 人日投入"
+          ],
+          "unknowns": [],
+          "rationale": "复用现有组件，工作量较小。"
+        },
+        {
+          "area": "compatibility",
+          "assessment": "不改变订单数据模型和状态枚举。",
+          "status": "feasible",
+          "evidence_refs": [
+            "requirements:constraints"
+          ],
+          "assumptions": [],
+          "unknowns": [],
+          "rationale": "保持现有接口和数据兼容。"
+        },
+        {
+          "area": "performance",
+          "assessment": "需要验证大数据量下的索引效果。",
+          "status": "conditionally_feasible",
+          "evidence_refs": [],
+          "assumptions": [
+            "现有索引可支持组合过滤"
+          ],
+          "unknowns": [
+            "未做 10 万订单压测"
+          ],
+          "rationale": "NFR-1 要求 p95 < 500ms，需实测。"
+        },
+        {
+          "area": "security",
+          "assessment": "沿用现有订单权限过滤。",
+          "status": "feasible",
+          "evidence_refs": [
+            "docs/architecture/security-architecture.md"
+          ],
+          "assumptions": [
+            "现有权限过滤覆盖筛选查询"
+          ],
+          "unknowns": [],
+          "rationale": "不新增数据访问路径。"
+        },
+        {
+          "area": "operations",
+          "assessment": "无新增运行组件。",
+          "status": "feasible",
+          "evidence_refs": [],
+          "assumptions": [],
+          "unknowns": [],
+          "rationale": "复用现有部署和监控。"
+        },
+        {
+          "area": "data_migration",
+          "assessment": "不涉及数据迁移。",
+          "status": "feasible",
+          "evidence_refs": [
+            "requirements:constraints"
+          ],
+          "assumptions": [],
+          "unknowns": [],
+          "rationale": "不修改订单数据模型。"
+        },
+        {
+          "area": "external_dependencies",
+          "assessment": "无新增外部系统。",
+          "status": "feasible",
+          "evidence_refs": [
+            "requirements:dependencies"
+          ],
+          "assumptions": [],
+          "unknowns": [],
+          "rationale": "仅依赖现有订单查询服务。"
+        },
+        {
+          "area": "delivery",
+          "assessment": "可按小步迭代交付。",
+          "status": "feasible",
+          "evidence_refs": [],
+          "assumptions": [
+            "需求范围不再扩大"
+          ],
+          "unknowns": [
+            "金额边界值待确认"
+          ],
+          "rationale": "方案 A 改动范围可控。"
+        }
+      ],
+      "risk_assessment": [
+        {
+          "risk_id": "RISK-1",
+          "description": "组合筛选导致查询性能下降。",
+          "category": "performance",
+          "likelihood": "medium",
+          "impact": "medium",
+          "severity": "medium",
+          "severity_basis": "NFR-1 要求 p95 < 500ms，但未实测索引效果。",
+          "mitigation": "增加查询压测和索引检查；必要时增加组合索引。",
+          "residual_risk": "low",
+          "evidence_refs": [
+            "requirements:NFR-1"
+          ],
+          "owner": "order-service-team",
+          "status": "known"
+        },
+        {
+          "risk_id": "RISK-2",
+          "description": "筛选条件可能绕过订单权限过滤。",
+          "category": "security",
+          "likelihood": "low",
+          "impact": "high",
+          "severity": "high",
+          "severity_basis": "权限缺陷可能暴露其他用户订单；依据安全架构的文件/数据边界要求。",
+          "mitigation": "复用现有权限过滤并在接口测试中覆盖越权场景。",
+          "residual_risk": "medium",
+          "evidence_refs": [
+            "docs/architecture/security-architecture.md"
+          ],
+          "owner": "security-reviewer",
+          "status": "suspected"
+        }
+      ],
+      "comparison_matrix": {
+        "method": "weighted scoring（0-5 分）",
+        "weighted": true,
+        "weight_basis": "团队评审共识：功能适配 0.4、性能 0.35、交付风险 0.25",
+        "dimensions": [
+          {
+            "id": "functional_fit",
+            "name": "功能适配",
+            "weight": 0.4,
+            "weight_basis": "需求覆盖优先",
+            "scores": [
+              {
+                "solution_id": "SOL-A",
+                "score": 4,
+                "not_applicable": false,
+                "basis": "覆盖 FR-1，复用现有接口",
+                "confidence": "high"
+              }
+            ]
+          },
+          {
+            "id": "performance",
+            "name": "性能",
+            "weight": 0.35,
+            "weight_basis": "NFR-1 响应时间要求",
+            "scores": [
+              {
+                "solution_id": "SOL-A",
+                "score": 3,
+                "not_applicable": false,
+                "basis": "依赖现有索引，未压测",
+                "confidence": "low"
+              }
+            ]
+          },
+          {
+            "id": "delivery_risk",
+            "name": "交付风险",
+            "weight": 0.25,
+            "weight_basis": "当前迭代时间约束",
+            "scores": [
+              {
+                "solution_id": "SOL-A",
+                "score": 5,
+                "not_applicable": false,
+                "basis": "改动小、依赖少",
+                "confidence": "high"
+              }
+            ]
+          }
+        ],
+        "comparison_summary": "当前需求只需标题搜索，扩展现有接口即可满足。"
+      },
+      "recommendation": {
+        "recommended_solution_id": "SOL-A",
+        "recommendation_summary": "扩展现有文档查询接口，增加标题关键字过滤。",
+        "rationale": "复用现有搜索索引和权限，改动范围最小；新增搜索服务没有必要。",
+        "trade_offs": [
+          "只支持标题字段",
+          "后续全文检索需重新评估"
+        ],
+        "unresolved_risks": [
+          "RISK-1"
+        ],
+        "conditions": [
+          "完成关键字搜索接口测试"
+        ],
+        "evidence_refs": [
+          "requirements:FR-1"
+        ],
+        "confidence": "high",
+        "recommendation_status": "recommended"
+      },
+      "facts": [
+        {
+          "statement": "用户要求按标题关键字搜索文档。",
+          "source_type": "user_stated",
+          "evidence_refs": []
+        },
+        {
+          "statement": "现有文档搜索索引已存在。",
+          "source_type": "evidence_backed",
+          "evidence_refs": [
+            "docs/architecture/module-architecture.md"
+          ]
+        }
+      ],
+      "assumptions": [
+        {
+          "id": "ASM-1",
+          "statement": "现有查询接口可以安全增加过滤参数。",
+          "basis": "模块架构显示查询服务可扩展；未在代码中逐项确认。",
+          "risk_if_wrong": "需要改造查询服务或增加独立服务。",
+          "status": "unconfirmed"
+        }
+      ],
+      "unknowns": [
+        {
+          "id": "UNK-1",
+          "description": "现有索引对组合筛选的实际性能未知。",
+          "impact": "可能影响 NFR-1。",
+          "blocking": false,
+          "status": "unknown"
+        }
+      ],
+      "next_steps": {
+        "blocking_questions": [],
+        "non_blocking_questions": [
+          "是否需要支持正文搜索？"
+        ],
+        "unknowns": [],
+        "required_evidence": [
+          "标题关键字搜索接口测试"
+        ],
+        "validation_tasks": [
+          "执行关键字搜索接口测试"
+        ],
+        "design_considerations": [
+          "保持查询接口向后兼容"
+        ]
+      },
+      "single_solution_rationale": "只有扩展现有搜索接口一个可行方案；新增独立搜索服务超出当前范围和成本。"
+    }
+  },
+  "artifacts": [
+    {
+      "path": "artifacts/task-20261120-an0002/analysis/analysis.md",
+      "version": 1,
+      "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "type": "analysis"
+    }
+  ],
+  "errors": [],
+  "evidence": []
+}

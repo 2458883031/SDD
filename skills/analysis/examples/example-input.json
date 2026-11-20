@@ -1,0 +1,91 @@
+{
+  "requirements_ref": {
+    "path": "artifacts/task-20261120-an0001/requirements/requirements.md",
+    "version": 1,
+    "sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+    "type": "requirements"
+  },
+  "requirements": {
+    "goal": "为订单列表增加按状态、时间和金额范围筛选的能力",
+    "scope": ["订单列表筛选面板", "筛选查询接口联动"],
+    "constraints": ["复用现有订单状态枚举", "不修改订单数据模型"],
+    "non_goals": ["不增加新订单状态", "不修改支付流程"],
+    "functional_requirements": [
+      {
+        "id": "FR-1",
+        "statement": "用户可以组合状态、时间和金额范围筛选订单",
+        "priority": "must",
+        "source_type": "user_stated"
+      }
+    ],
+    "non_functional_requirements": [
+      {
+        "id": "NFR-1",
+        "category": "performance",
+        "statement": "筛选查询保持可接受响应时间",
+        "measurable_target": "p95 < 500ms（10 万订单测试集）",
+        "source_type": "user_stated"
+      }
+    ],
+    "dependencies": [
+      {
+        "id": "DEP-1",
+        "name": "订单查询服务",
+        "type": "service",
+        "description": "筛选依赖现有订单查询服务支持过滤参数"
+      }
+    ],
+    "assumptions": [
+      {
+        "id": "ASM-1",
+        "statement": "现有订单状态枚举足够支持业务筛选",
+        "basis": "订单模型已有状态字段；未逐项与用户确认",
+        "status": "unconfirmed"
+      }
+    ],
+    "unknowns": [
+      {
+        "id": "UNK-1",
+        "description": "是否需要保存筛选条件",
+        "impact": "影响前端状态管理",
+        "blocking": false
+      }
+    ],
+    "open_questions": [
+      {
+        "id": "Q-1",
+        "question": "金额范围是否包含边界值？",
+        "blocking": false
+      }
+    ],
+    "acceptance_criteria": [
+      {
+        "id": "AC-1",
+        "criterion": "组合筛选结果与查询接口一致",
+        "verification": "接口契约测试",
+        "related_requirement_ids": ["FR-1"]
+      }
+    ],
+    "source_refs": [
+      {
+        "path": "artifacts/task-20261120-an0001/requirements/requirements.md",
+        "version": 1,
+        "sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+        "type": "requirements"
+      }
+    ],
+    "requirements_version": "0.2.0"
+  },
+  "project_context": {
+    "service": "order-service",
+    "environment": "dev/test",
+    "notes": "已有订单列表和查询接口"
+  },
+  "technical_context": {
+    "tech_stack": ["TypeScript", "Node.js", "React"],
+    "database": "PostgreSQL",
+    "deployment": "container"
+  },
+  "constraints": ["不修改生产数据模型"],
+  "evidence_refs": ["docs/architecture/module-architecture.md"]
+}

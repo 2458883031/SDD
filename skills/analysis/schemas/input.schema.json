@@ -1,0 +1,82 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sdd.local/skills/analysis/input.schema.json",
+  "title": "AnalysisInput",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["requirements_ref"],
+  "properties": {
+    "requirements_ref": {
+      "$ref": "#/$defs/artifactRef"
+    },
+    "requirements": {
+      "type": "object",
+      "description": "R1 Requirements 输出中的 data.requirements；由校验器复用 requirements-clarity/output.schema.json 校验，不在本文件重复定义"
+    },
+    "project_context": {
+      "type": "object",
+      "description": "项目上下文摘要；不得包含凭证",
+      "additionalProperties": true
+    },
+    "technical_context": {
+      "type": "object",
+      "description": "已知技术环境摘要，可由调用方提供；缺失项由 Analysis 标记 unknown",
+      "additionalProperties": true
+    },
+    "constraints": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "default": []
+    },
+    "existing_analysis": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/artifactRef" },
+      "default": []
+    },
+    "evidence_refs": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "default": []
+    },
+    "change_context": {
+      "$ref": "#/$defs/changeContext"
+    },
+    "requested_scope": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "$defs": {
+    "artifactRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "version", "sha256", "type"],
+      "properties": {
+        "path": { "type": "string", "minLength": 1 },
+        "version": { "type": "integer", "minimum": 1 },
+        "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "type": {
+          "type": "string",
+          "enum": ["requirements", "analysis", "design", "plan", "report", "other"]
+        }
+      }
+    },
+    "changeContext": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["reason", "changed_items"],
+      "properties": {
+        "reason": { "type": "string", "minLength": 1 },
+        "changed_items": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "previous_requirements": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/artifactRef" }
+        }
+      }
+    }
+  }
+}

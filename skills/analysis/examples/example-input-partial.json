@@ -1,0 +1,49 @@
+{
+  "requirements_ref": {
+    "path": "artifacts/task-20261120-an0003/requirements/requirements.md",
+    "version": 2,
+    "sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+    "type": "requirements"
+  },
+  "requirements": {
+    "goal": "调整订单导出范围",
+    "scope": ["订单导出"],
+    "constraints": ["必须符合数据访问权限"],
+    "non_goals": ["不修改订单数据模型"],
+    "functional_requirements": [
+      {
+        "id": "FR-1",
+        "statement": "按用户权限导出订单",
+        "priority": "must",
+        "source_type": "user_stated"
+      }
+    ],
+    "non_functional_requirements": [],
+    "unknowns": [
+      {
+        "id": "UNK-1",
+        "description": "导出数据保留期限未确定",
+        "blocking": true
+      }
+    ],
+    "open_questions": [
+      {
+        "id": "Q-1",
+        "question": "导出文件保留多久？",
+        "blocking": true
+      }
+    ],
+    "acceptance_criteria": [
+      {
+        "id": "AC-1",
+        "criterion": "导出文件只包含有权限的订单",
+        "verification": "权限测试",
+        "related_requirement_ids": ["FR-1"]
+      }
+    ],
+    "source_refs": [],
+    "requirements_version": "0.2.1"
+  },
+  "project_context": {"service": "order-service"},
+  "constraints": ["数据保留期限必须明确"]
+}

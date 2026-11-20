@@ -1,0 +1,58 @@
+{
+  "status": "needs_input",
+  "data": {
+    "questions": [
+      "导出文件保留多久？",
+      "导出范围是否包含历史订单？"
+    ],
+    "analysis": {
+      "analysis_id": "AN-20261120-003",
+      "analysis_version": "0.1.0",
+      "source_requirements_ref": {
+        "path": "artifacts/task-20261120-an0003/requirements/requirements.md",
+        "version": 2,
+        "sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+        "type": "requirements"
+      },
+      "source_requirements_version": "0.2.1",
+      "problem_statement": {
+        "description": "订单导出范围需要调整，但数据保留期限未确定。",
+        "goal": "在符合权限的前提下调整订单导出范围。",
+        "scope": ["订单导出"],
+        "non_goals": ["不修改订单数据模型"],
+        "constraints": ["必须符合数据访问权限", "数据保留期限必须明确"],
+        "known_conditions": ["已有订单导出入口"]
+      },
+      "technical_context": {
+        "tech_stack": ["TypeScript", "Node.js", "PostgreSQL"],
+        "system_structure": "订单导出服务读取订单数据并生成文件。",
+        "external_systems": [],
+        "technical_dependencies": ["订单导出服务"],
+        "data_environment": "dev/test 环境；不访问生产数据",
+        "runtime_environment": "Node.js 20 容器",
+        "known_limitations": ["导出数据保留策略未定义"],
+        "unknowns": ["导出文件保留期限"]
+      },
+      "unknowns": [
+        {
+          "id": "UNK-1",
+          "description": "导出数据保留期限未确定。",
+          "impact": "影响导出文件生命周期和权限策略。",
+          "blocking": true,
+          "status": "unknown"
+        }
+      ],
+      "next_steps": {
+        "blocking_questions": ["导出文件保留多久？", "导出范围是否包含历史订单？"],
+        "non_blocking_questions": [],
+        "unknowns": ["导出数据保留期限"],
+        "required_evidence": ["数据保留策略"],
+        "validation_tasks": ["补充保留期限后再评估导出方案"],
+        "design_considerations": ["权限过滤和文件生命周期"]
+      }
+    }
+  },
+  "artifacts": [],
+  "errors": [],
+  "evidence": []
+}

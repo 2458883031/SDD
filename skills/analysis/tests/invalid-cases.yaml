@@ -1,0 +1,34 @@
+skill: analysis
+description: "Inputs that MUST be rejected by input.schema.json"
+invalid_cases:
+  - name: missing-requirements-ref
+    input:
+      project_context: {}
+    expect_schema_error: true
+  - name: bad-requirements-ref
+    input:
+      requirements_ref:
+        path: artifacts/task-20261120-an0001/requirements/requirements.md
+        version: 1
+        sha256: not-a-sha
+        type: requirements
+    expect_schema_error: true
+  - name: bad-change-context
+    input:
+      requirements_ref:
+        path: artifacts/task-20261120-an0001/requirements/requirements.md
+        version: 1
+        sha256: 1111111111111111111111111111111111111111111111111111111111111111
+        type: requirements
+      change_context:
+        reason: "需求调整"
+    expect_schema_error: true
+  - name: unknown-field
+    input:
+      requirements_ref:
+        path: artifacts/task-20261120-an0001/requirements/requirements.md
+        version: 1
+        sha256: 1111111111111111111111111111111111111111111111111111111111111111
+        type: requirements
+      unexpected_field: true
+    expect_schema_error: true

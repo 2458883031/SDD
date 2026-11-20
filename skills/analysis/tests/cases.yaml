@@ -1,0 +1,21 @@
+skill: analysis
+version: 0.1.0
+cases:
+  - name: multi-candidate-analysis
+    input_example: examples/example-input.json
+    expect:
+      status: ok
+      output_example: examples/example-output.json
+      required_output_fields: [problem_statement, technical_context, candidate_solutions, feasibility_assessment, risk_assessment, comparison_matrix, recommendation]
+  - name: single-solution-analysis
+    input_example: examples/example-input-single.json
+    expect:
+      status: ok
+      output_example: examples/example-output-single-solution.json
+      required_output_fields: [candidate_solutions, single_solution_rationale, recommendation]
+  - name: blocking-requirements
+    input_example: examples/example-input-partial.json
+    expect:
+      status: needs_input
+      output_example: examples/example-output-partial.json
+      questions_min: 1

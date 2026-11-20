@@ -1,0 +1,393 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sdd.local/skills/analysis/output.schema.json",
+  "title": "AnalysisOutput",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["status", "artifacts", "errors", "evidence"],
+  "properties": {
+    "status": {
+      "type": "string",
+      "enum": ["ok", "needs_input", "needs_approval", "blocked", "failed"]
+    },
+    "data": { "type": "object" },
+    "artifacts": { "type": "array", "items": { "$ref": "#/$defs/artifactRef" } },
+    "errors": { "type": "array", "items": { "$ref": "#/$defs/error" } },
+    "evidence": { "type": "array", "items": { "$ref": "#/$defs/evidence" } }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "status": { "const": "ok" } }, "required": ["status"] },
+      "then": {
+        "required": ["data"],
+        "properties": {
+          "data": { "$ref": "#/$defs/okData" },
+          "errors": { "maxItems": 0 }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "status": { "const": "needs_input" } }, "required": ["status"] },
+      "then": {
+        "required": ["data"],
+        "properties": { "data": { "$ref": "#/$defs/needsInputData" } }
+      }
+    },
+    {
+      "if": { "properties": { "status": { "const": "needs_approval" } }, "required": ["status"] },
+      "then": {
+        "required": ["data"],
+        "properties": { "data": { "$ref": "#/$defs/needsApprovalData" } }
+      }
+    },
+    {
+      "if": { "properties": { "status": { "const": "blocked" } }, "required": ["status"] },
+      "then": {
+        "required": ["data"],
+        "properties": { "data": { "$ref": "#/$defs/blockedData" } }
+      }
+    },
+    {
+      "if": { "properties": { "status": { "const": "failed" } }, "required": ["status"] },
+      "then": { "properties": { "errors": { "minItems": 1 } } }
+    }
+  ],
+  "$defs": {
+    "artifactRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "version", "sha256", "type"],
+      "properties": {
+        "path": { "type": "string", "minLength": 1 },
+        "version": { "type": "integer", "minimum": 1 },
+        "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "type": {
+          "type": "string",
+          "enum": ["requirements", "analysis", "design", "plan", "report", "other"]
+        }
+      }
+    },
+    "error": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "message"],
+      "properties": {
+        "code": { "type": "string", "minLength": 1 },
+        "message": { "type": "string", "minLength": 1 },
+        "field": { "type": "string" },
+        "retryable": { "type": "boolean" },
+        "details": { "type": "object" }
+      }
+    },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "ref"],
+      "properties": {
+        "type": { "type": "string", "enum": ["test", "review", "command", "artifact", "other"] },
+        "ref": { "type": "string", "minLength": 1 },
+        "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "note": { "type": "string" }
+      }
+    },
+    "problemStatement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["description", "goal", "scope", "non_goals", "constraints", "known_conditions"],
+      "properties": {
+        "description": { "type": "string", "minLength": 1 },
+        "goal": { "type": "string", "minLength": 1 },
+        "scope": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "non_goals": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "constraints": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "known_conditions": { "type": "array", "items": { "type": "string", "minLength": 1 } }
+      }
+    },
+    "technicalContext": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["tech_stack", "system_structure", "external_systems", "technical_dependencies", "data_environment", "runtime_environment", "known_limitations", "unknowns"],
+      "properties": {
+        "tech_stack": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "system_structure": { "type": "string", "minLength": 1 },
+        "external_systems": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "technical_dependencies": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "data_environment": { "type": "string", "minLength": 1 },
+        "runtime_environment": { "type": "string", "minLength": 1 },
+        "known_limitations": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "unknowns": { "type": "array", "items": { "type": "string", "minLength": 1 } }
+      }
+    },
+    "costEstimate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["estimate", "basis", "confidence"],
+      "properties": {
+        "estimate": { "type": "string", "minLength": 1 },
+        "basis": { "type": "string", "minLength": 1 },
+        "confidence": { "type": "string", "enum": ["low", "medium", "high", "unknown"] }
+      }
+    },
+    "candidateSolution": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "solution_id", "name", "description", "approach", "applicable_requirements",
+        "prerequisites", "advantages", "disadvantages", "technical_complexity",
+        "implementation_cost_estimate", "operational_cost_estimate",
+        "performance_impact", "security_impact", "maintainability", "scalability",
+        "migration_impact", "compatibility_impact", "dependencies", "risks",
+        "evidence_refs", "assumptions", "unknowns"
+      ],
+      "properties": {
+        "solution_id": { "type": "string", "pattern": "^SOL-[A-Za-z0-9-]+$" },
+        "name": { "type": "string", "minLength": 1 },
+        "description": { "type": "string", "minLength": 1 },
+        "approach": { "type": "string", "minLength": 1 },
+        "applicable_requirements": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } },
+        "prerequisites": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "advantages": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "disadvantages": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "technical_complexity": { "type": "string", "enum": ["low", "medium", "high", "unknown"] },
+        "implementation_cost_estimate": { "$ref": "#/$defs/costEstimate" },
+        "operational_cost_estimate": { "$ref": "#/$defs/costEstimate" },
+        "performance_impact": { "type": "string", "enum": ["low", "medium", "high", "unknown"] },
+        "security_impact": { "type": "string", "enum": ["low", "medium", "high", "unknown"] },
+        "maintainability": { "type": "string", "enum": ["low", "medium", "high", "unknown"] },
+        "scalability": { "type": "string", "enum": ["low", "medium", "high", "unknown"] },
+        "migration_impact": { "type": "string", "enum": ["low", "medium", "high", "unknown"] },
+        "compatibility_impact": { "type": "string", "enum": ["low", "medium", "high", "unknown"] },
+        "dependencies": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "risks": { "type": "array", "items": { "type": "string", "pattern": "^RISK-[A-Za-z0-9-]+$" } },
+        "evidence_refs": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "assumptions": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "unknowns": { "type": "array", "items": { "type": "string", "minLength": 1 } }
+      }
+    },
+    "feasibilityItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["area", "assessment", "status", "evidence_refs", "assumptions", "unknowns", "rationale"],
+      "properties": {
+        "area": { "type": "string", "enum": ["technical", "resource", "compatibility", "performance", "security", "operations", "data_migration", "external_dependencies", "delivery"] },
+        "assessment": { "type": "string", "minLength": 1 },
+        "status": { "type": "string", "enum": ["feasible", "conditionally_feasible", "infeasible", "unknown"] },
+        "evidence_refs": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "assumptions": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "unknowns": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "rationale": { "type": "string", "minLength": 1 }
+      }
+    },
+    "riskItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["risk_id", "description", "category", "likelihood", "impact", "severity", "severity_basis", "mitigation", "residual_risk", "evidence_refs", "status"],
+      "properties": {
+        "risk_id": { "type": "string", "pattern": "^RISK-[A-Za-z0-9-]+$" },
+        "description": { "type": "string", "minLength": 1 },
+        "category": { "type": "string", "enum": ["technical", "security", "performance", "operational", "data", "compliance", "delivery", "other"] },
+        "likelihood": { "type": "string", "enum": ["low", "medium", "high", "critical", "unknown"] },
+        "impact": { "type": "string", "enum": ["low", "medium", "high", "critical", "unknown"] },
+        "severity": { "type": "string", "enum": ["low", "medium", "high", "critical", "unknown"] },
+        "severity_basis": { "type": "string", "minLength": 1 },
+        "mitigation": { "type": "string", "minLength": 1 },
+        "residual_risk": { "type": "string", "enum": ["low", "medium", "high", "critical", "unknown"] },
+        "evidence_refs": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "owner": { "type": "string" },
+        "status": { "type": "string", "enum": ["known", "suspected", "not_assessed"] }
+      }
+    },
+    "comparisonScore": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["solution_id", "score", "not_applicable", "basis", "confidence"],
+      "properties": {
+        "solution_id": { "type": "string", "pattern": "^SOL-[A-Za-z0-9-]+$" },
+        "score": { "type": ["number", "null"], "minimum": 0, "maximum": 5 },
+        "not_applicable": { "type": "boolean" },
+        "basis": { "type": "string", "minLength": 1 },
+        "confidence": { "type": "string", "enum": ["low", "medium", "high", "unknown"] }
+      }
+    },
+    "comparisonDimension": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name", "scores"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "name": { "type": "string", "minLength": 1 },
+        "weight": { "type": "number", "minimum": 0, "maximum": 1 },
+        "weight_basis": { "type": "string" },
+        "scores": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/comparisonScore" } }
+      }
+    },
+    "comparisonMatrix": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["method", "weighted", "dimensions", "comparison_summary"],
+      "properties": {
+        "method": { "type": "string", "minLength": 1 },
+        "weighted": { "type": "boolean" },
+        "weight_basis": { "type": "string" },
+        "dimensions": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/comparisonDimension" } },
+        "comparison_summary": { "type": "string", "minLength": 1 }
+      }
+    },
+    "recommendation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["recommended_solution_id", "recommendation_summary", "rationale", "trade_offs", "unresolved_risks", "conditions", "evidence_refs", "confidence", "recommendation_status"],
+      "properties": {
+        "recommended_solution_id": { "type": "string", "pattern": "^SOL-[A-Za-z0-9-]+$" },
+        "recommendation_summary": { "type": "string", "minLength": 1 },
+        "rationale": { "type": "string", "minLength": 1 },
+        "trade_offs": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "unresolved_risks": { "type": "array", "items": { "type": "string", "pattern": "^RISK-[A-Za-z0-9-]+$" } },
+        "conditions": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "evidence_refs": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "confidence": { "type": "string", "enum": ["low", "medium", "high", "unknown"] },
+        "recommendation_status": { "type": "string", "enum": ["recommended", "conditionally_recommended", "no_recommendation"] }
+      }
+    },
+    "nextSteps": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["blocking_questions", "non_blocking_questions", "unknowns", "required_evidence", "validation_tasks", "design_considerations"],
+      "properties": {
+        "blocking_questions": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "non_blocking_questions": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "unknowns": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "required_evidence": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "validation_tasks": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "design_considerations": { "type": "array", "items": { "type": "string", "minLength": 1 } }
+      }
+    },
+    "fact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["statement", "source_type", "evidence_refs"],
+      "properties": {
+        "statement": { "type": "string", "minLength": 1 },
+        "source_type": { "type": "string", "enum": ["user_stated", "evidence_backed"] },
+        "evidence_refs": { "type": "array", "items": { "type": "string", "minLength": 1 } }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "source_type": { "const": "evidence_backed" } }, "required": ["source_type"] },
+          "then": {
+            "properties": { "evidence_refs": { "minItems": 1 } },
+            "required": ["evidence_refs"]
+          }
+        }
+      ]
+    },
+    "assumption": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "statement", "basis", "status"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^ASM-[A-Za-z0-9-]+$" },
+        "statement": { "type": "string", "minLength": 1 },
+        "basis": { "type": "string", "minLength": 1 },
+        "risk_if_wrong": { "type": "string" },
+        "status": { "type": "string", "enum": ["unconfirmed"] }
+      }
+    },
+    "unknown": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "description", "blocking", "status"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^UNK-[A-Za-z0-9-]+$" },
+        "description": { "type": "string", "minLength": 1 },
+        "impact": { "type": "string" },
+        "blocking": { "type": "boolean" },
+        "status": { "type": "string", "enum": ["unknown"] }
+      }
+    },
+    "analysisData": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "analysis_id": { "type": "string", "pattern": "^AN-[A-Za-z0-9-]+$" },
+        "analysis_version": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(?:-[0-9A-Za-z.-]+)?(?:\\+[0-9A-Za-z.-]+)?$"
+        },
+        "created_at": { "type": "string", "format": "date-time" },
+        "source_requirements_ref": { "$ref": "#/$defs/artifactRef" },
+        "source_requirements_version": { "type": "string" },
+        "source_refs": { "type": "array", "items": { "$ref": "#/$defs/artifactRef" } },
+        "problem_statement": { "$ref": "#/$defs/problemStatement" },
+        "technical_context": { "$ref": "#/$defs/technicalContext" },
+        "candidate_solutions": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/candidateSolution" } },
+        "feasibility_assessment": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/feasibilityItem" } },
+        "risk_assessment": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/riskItem" } },
+        "comparison_matrix": { "$ref": "#/$defs/comparisonMatrix" },
+        "recommendation": { "$ref": "#/$defs/recommendation" },
+        "facts": { "type": "array", "items": { "$ref": "#/$defs/fact" } },
+        "assumptions": { "type": "array", "items": { "$ref": "#/$defs/assumption" } },
+        "unknowns": { "type": "array", "items": { "$ref": "#/$defs/unknown" } },
+        "next_steps": { "$ref": "#/$defs/nextSteps" },
+        "single_solution_rationale": { "type": "string" }
+      }
+    },
+    "okData": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["analysis"],
+      "properties": { "analysis": { "$ref": "#/$defs/analysisData" } },
+      "allOf": [
+        {
+          "properties": {
+            "analysis": {
+              "required": [
+                "analysis_id", "analysis_version", "source_requirements_ref",
+                "problem_statement", "technical_context", "candidate_solutions",
+                "feasibility_assessment", "risk_assessment", "comparison_matrix",
+                "recommendation", "next_steps"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "needsInputData": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["questions"],
+      "properties": {
+        "questions": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } },
+        "analysis": { "$ref": "#/$defs/analysisData" }
+      }
+    },
+    "needsApprovalData": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["approval_request"],
+      "properties": {
+        "approval_request": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["gate_or_sa", "reason", "impact", "rollback"],
+          "properties": {
+            "gate_or_sa": { "type": "string", "minLength": 1 },
+            "reason": { "type": "string", "minLength": 1 },
+            "impact": { "type": "string", "minLength": 1 },
+            "rollback": { "type": "string", "minLength": 1 }
+          }
+        },
+        "analysis": { "$ref": "#/$defs/analysisData" }
+      }
+    },
+    "blockedData": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["blocked_reason"],
+      "properties": {
+        "blocked_reason": { "type": "string", "minLength": 1 },
+        "analysis": { "$ref": "#/$defs/analysisData" }
+      }
+    }
+  }
+}
