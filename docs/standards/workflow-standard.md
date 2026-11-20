@@ -401,6 +401,7 @@ PENDING → RUNNING → SUCCEEDED
 - [orchestration-state-machine.md](./orchestration-state-machine.md)
 - [gate-orchestration-standard.md](./gate-orchestration-standard.md)
 - [approval-orchestration-standard.md](./approval-orchestration-standard.md)
+- [failure-recovery-standard.md](./failure-recovery-standard.md)
 - [execution-evidence-standard.md](./execution-evidence-standard.md)
 - [ADR-003](../decisions/ADR-003-orchestration.md)、[ADR-006](../decisions/ADR-006-quality-gates.md)
 

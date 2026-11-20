@@ -289,6 +289,7 @@ Task 进入 `SUCCEEDED` 必须同时满足：
 - [task-classification-standard.md](./task-classification-standard.md)
 - [workflow-standard.md](./workflow-standard.md)
 - [orchestration-state-machine.md](./orchestration-state-machine.md)
+- [failure-recovery-standard.md](./failure-recovery-standard.md)
 - [execution-evidence-standard.md](./execution-evidence-standard.md)
 - [ADR-005](../decisions/ADR-005-task-context.md)
 
