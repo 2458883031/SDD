@@ -1,0 +1,23 @@
+{
+  "evidence_id": "ev-20261120-0004",
+  "task_id": "task-20261120-a1b2c3d4",
+  "workflow_id": "feature-development",
+  "node_id": "code_review",
+  "type": "gate",
+  "actor": { "type": "orchestrator", "id": "orchestrator-main" },
+  "skill": { "name": "code-review", "version": "0.1.0" },
+  "tool": null,
+  "input_refs": ["artifacts/task-20261120-a1b2c3d4/implementation/change.patch@2"],
+  "output_refs": ["artifacts/task-20261120-a1b2c3d4/review/review-report.md@1"],
+  "input_summary": "审查 implementation change.patch v2 的 diff。",
+  "subject_hash": "2222222222222222222222222222222222222222",
+  "result": "success",
+  "timestamp": "2026-11-20T10:25:00Z",
+  "redacted": true,
+  "details": {
+    "reviewer": "independent-reviewer-1",
+    "issues": 0,
+    "commit": "2222222222222222222222222222222222222222"
+  },
+  "parent_evidence_id": null
+}

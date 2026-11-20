@@ -1,0 +1,82 @@
+schema_version: 1
+id: new-project
+version: "0.1.0"
+name: 新项目开发
+description: 从零构建项目的完整流程；仅计划生产部署时才追加 G6。
+status: draft
+trigger:
+  task_types: [new_project]
+  complexity: [L3]
+  risk_levels: [medium, high, critical]
+  environments: [dev, test, staging, prod]
+  change_types: [code, config, docs]
+policies:
+  max_concurrency: 5
+  failure_policy: fail_workflow
+  evidence_level: strict
+nodes:
+  - id: requirements
+    type: skill
+    skill: requirements-clarity
+    outputs:
+      - name: requirements
+  - id: g1
+    type: gate
+    gate: G1
+    depends_on: [requirements]
+  - id: analysis
+    type: skill
+    skill: analysis
+    depends_on: [g1]
+    outputs:
+      - name: analysis
+  - id: design
+    type: skill
+    skill: design
+    depends_on: [analysis]
+    outputs:
+      - name: design
+  - id: g2
+    type: gate
+    gate: G2
+    description: 架构与设计确认，包含 Builder Check 和技术选型审查。
+    depends_on: [design]
+  - id: g3
+    type: gate
+    gate: G3
+    depends_on: [g2]
+  - id: coding
+    type: skill
+    skill: coding
+    depends_on: [g3]
+    outputs:
+      - name: implementation
+  - id: code_review
+    type: skill
+    skill: code-review
+    depends_on: [coding]
+    gate: G4
+    parallel_group: quality
+    outputs:
+      - name: review-report
+  - id: testing
+    type: skill
+    skill: testing
+    depends_on: [coding]
+    gate: G5
+    parallel_group: quality
+    outputs:
+      - name: test-report
+  - id: quality_gate
+    type: gate
+    gates: [G4, G5]
+    depends_on: [code_review, testing]
+  - id: documentation
+    type: skill
+    skill: documentation
+    depends_on: [quality_gate]
+    outputs:
+      - name: technical-docs
+  - id: end
+    type: end
+    depends_on: [documentation]

@@ -1,0 +1,221 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sdd.local/schemas/orchestration/workflow.schema.json",
+  "title": "SDDWorkflow",
+  "description": "声明式 SDD Workflow 定义（P1-002，静态 Schema，不代表 Runtime 已实现）",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "id", "version", "name", "status", "trigger", "nodes"],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "id": { "type": "string", "pattern": "^[a-z][a-z0-9-]{1,63}$" },
+    "version": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(?:-[0-9A-Za-z.-]+)?(?:\\+[0-9A-Za-z.-]+)?$"
+    },
+    "name": { "type": "string", "minLength": 1, "maxLength": 120 },
+    "description": { "type": "string" },
+    "status": {
+      "type": "string",
+      "enum": ["draft", "review", "tested", "published", "deprecated", "retired", "archived"]
+    },
+    "trigger": { "$ref": "#/$defs/trigger" },
+    "inputs": { "type": "array", "items": { "$ref": "#/$defs/ioRef" }, "uniqueItems": true },
+    "outputs": { "type": "array", "items": { "$ref": "#/$defs/ioRef" }, "uniqueItems": true },
+    "nodes": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/node" } },
+    "policies": { "$ref": "#/$defs/policies" },
+    "metadata": { "type": "object" }
+  },
+  "$defs": {
+    "trigger": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["task_types"],
+      "properties": {
+        "task_types": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "enum": [
+              "technical_consultation",
+              "simple_change",
+              "bug_fix",
+              "feature_development",
+              "system_refactoring",
+              "new_project",
+              "testing_task",
+              "deployment_task",
+              "documentation_task"
+            ]
+          }
+        },
+        "complexity": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string", "enum": ["L1", "L2", "L3"] }
+        },
+        "risk_levels": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string", "enum": ["low", "medium", "high", "critical"] }
+        },
+        "environments": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string", "enum": ["dev", "test", "staging", "prod", "other"] }
+        },
+        "change_types": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string", "enum": ["code", "config", "data", "docs", "deployment", "analysis"] }
+        }
+      }
+    },
+    "ioRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "type": { "type": "string", "minLength": 1 },
+        "required": { "type": "boolean", "default": true },
+        "description": { "type": "string" }
+      }
+    },
+    "node": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "type"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z][a-z0-9_-]{1,63}$" },
+        "type": {
+          "type": "string",
+          "enum": ["skill", "tool", "gate", "parallel", "check", "end", "subworkflow", "approval"]
+        },
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "skill": { "type": "string", "minLength": 1 },
+        "tool": { "type": "string", "minLength": 1 },
+        "workflow_ref": { "type": "string", "minLength": 1 },
+        "gate": {
+          "oneOf": [
+            { "type": "string", "enum": ["G1", "G2", "G3", "G4", "G5", "G6"] },
+            {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": { "type": "string", "enum": ["G1", "G2", "G3", "G4", "G5", "G6"] }
+            }
+          ]
+        },
+        "gates": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "type": "string", "enum": ["G1", "G2", "G3", "G4", "G5", "G6"] }
+        },
+        "approval": { "$ref": "#/$defs/approvalRequirement" },
+        "depends_on": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string", "pattern": "^[a-z][a-z0-9_-]{1,63}$" }
+        },
+        "inputs": { "type": "array", "items": { "$ref": "#/$defs/ioRef" }, "uniqueItems": true },
+        "outputs": { "type": "array", "items": { "$ref": "#/$defs/ioRef" }, "uniqueItems": true },
+        "condition": { "type": "string", "minLength": 1 },
+        "parallel_group": { "type": "string", "minLength": 1 },
+        "join_policy": { "type": "string", "enum": ["all", "any", "quorum"] },
+        "quorum": { "type": "integer", "minimum": 1 },
+        "retry_policy": { "$ref": "#/$defs/retryPolicy" },
+        "timeout_seconds": { "type": "integer", "minimum": 1 },
+        "on_success": { "type": "string", "minLength": 1 },
+        "on_failure": { "type": "string", "minLength": 1 },
+        "artifacts": { "type": "array", "uniqueItems": true, "items": { "type": "string" } },
+        "risk_level": { "type": "string", "enum": ["low", "medium", "high", "critical"] },
+        "permissions": { "type": "array", "uniqueItems": true, "items": { "type": "string" } },
+        "idempotency_key": { "type": "string", "minLength": 1 }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "type": { "const": "skill" } }, "required": ["type"] },
+          "then": { "required": ["skill"] }
+        },
+        {
+          "if": { "properties": { "type": { "const": "tool" } }, "required": ["type"] },
+          "then": { "required": ["tool"] }
+        },
+        {
+          "if": { "properties": { "type": { "const": "subworkflow" } }, "required": ["type"] },
+          "then": { "required": ["workflow_ref"] }
+        },
+        {
+          "if": { "properties": { "type": { "const": "approval" } }, "required": ["type"] },
+          "then": { "required": ["approval"] }
+        },
+        {
+          "if": { "properties": { "type": { "const": "gate" } }, "required": ["type"] },
+          "then": {
+            "anyOf": [
+              { "required": ["gate"] },
+              { "required": ["gates"] }
+            ]
+          }
+        }
+      ]
+    },
+    "retryPolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["max_attempts", "backoff"],
+      "properties": {
+        "max_attempts": { "type": "integer", "minimum": 1, "maximum": 10 },
+        "backoff": { "type": "string", "enum": ["fixed", "exponential"] },
+        "initial_delay_seconds": { "type": "integer", "minimum": 0 },
+        "max_delay_seconds": { "type": "integer", "minimum": 0 },
+        "jitter": { "type": "boolean" },
+        "retry_budget_seconds": { "type": "integer", "minimum": 0 },
+        "retry_on": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string", "enum": ["retryable", "timeout", "agent_unavailable", "tool_error"] }
+        },
+        "non_retryable": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string", "enum": ["non_retryable", "permission_denied", "input_invalid", "irreversible"] }
+        }
+      }
+    },
+    "approvalRequirement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type"],
+      "properties": {
+        "type": { "type": "string", "enum": ["gate", "sa", "both"] },
+        "gate": { "type": "string", "enum": ["G1", "G2", "G3", "G4", "G5", "G6"] },
+        "sa": { "type": "boolean" },
+        "reason": { "type": "string" },
+        "expires_in_seconds": { "type": "integer", "minimum": 1 },
+        "approver_role": { "type": "string" }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "type": { "enum": ["gate", "both"] } }, "required": ["type"] },
+          "then": { "required": ["gate"] }
+        }
+      ]
+    },
+    "policies": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "max_concurrency": { "type": "integer", "minimum": 1, "maximum": 20, "default": 5 },
+        "default_timeout_seconds": { "type": "integer", "minimum": 1 },
+        "failure_policy": { "type": "string", "enum": ["fail_workflow", "continue_independent"] },
+        "evidence_level": { "type": "string", "enum": ["basic", "standard", "strict"] }
+      }
+    }
+  }
+}

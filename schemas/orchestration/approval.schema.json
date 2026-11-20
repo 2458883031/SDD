@@ -1,0 +1,75 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sdd.local/schemas/orchestration/approval.schema.json",
+  "title": "SDDApproval",
+  "description": "G1–G6 与 SA 的 Approval 对象；单次使用并绑定 Task/操作/目标/产物",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "approval_id", "task_id", "workflow_id", "node_id", "type",
+    "operation", "target", "environment", "risk_level", "permission_level",
+    "requested_by", "requested_at", "reason", "impact", "rollback",
+    "scope", "evidence_refs", "expires_at", "single_use", "status"
+  ],
+  "properties": {
+    "approval_id": { "type": "string", "minLength": 1 },
+    "task_id": { "type": "string", "pattern": "^task-[0-9]{8}-[a-z0-9]{4,36}$" },
+    "workflow_id": { "type": "string", "pattern": "^[a-z][a-z0-9-]{1,63}$" },
+    "node_id": { "type": "string", "pattern": "^[a-z][a-z0-9_-]{1,63}$" },
+    "type": { "type": "string", "enum": ["gate", "sa", "both"] },
+    "gate": { "type": ["string", "null"], "enum": ["G1", "G2", "G3", "G4", "G5", "G6", null] },
+    "operation": { "type": "string", "minLength": 1 },
+    "target": { "type": "string", "minLength": 1 },
+    "environment": { "type": "string", "enum": ["dev", "test", "staging", "prod", "other"] },
+    "risk_level": { "type": "string", "enum": ["low", "medium", "high", "critical"] },
+    "permission_level": { "type": "string", "enum": ["R0", "R1", "R2", "R3", "R4"] },
+    "requested_by": { "$ref": "#/$defs/actor" },
+    "requested_at": { "type": "string", "format": "date-time" },
+    "reason": { "type": "string", "minLength": 1 },
+    "impact": { "type": "string", "minLength": 1 },
+    "rollback": { "type": "string", "minLength": 1 },
+    "scope": { "type": "object" },
+    "subject_hash": { "type": ["string", "null"] },
+    "evidence_refs": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
+    "expires_at": { "type": "string", "format": "date-time" },
+    "single_use": { "const": true },
+    "status": {
+      "type": "string",
+      "enum": ["REQUESTED", "PENDING", "APPROVED", "REJECTED", "EXPIRED", "REVOKED", "INVALIDATED"]
+    },
+    "decided_by": { "type": ["string", "null"] },
+    "decided_at": { "type": ["string", "null"], "format": "date-time" },
+    "decision_reason": { "type": ["string", "null"] }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "type": { "enum": ["gate", "both"] } }, "required": ["type"] },
+      "then": {
+        "properties": { "gate": { "type": "string", "enum": ["G1", "G2", "G3", "G4", "G5", "G6"] } },
+        "required": ["gate"]
+      }
+    },
+    {
+      "if": { "properties": { "status": { "const": "APPROVED" } }, "required": ["status"] },
+      "then": {
+        "properties": {
+          "decided_by": { "type": "string", "minLength": 1 },
+          "decided_at": { "type": "string", "format": "date-time" },
+          "decision_reason": { "type": "string", "minLength": 1 }
+        },
+        "required": ["decided_by", "decided_at", "decision_reason"]
+      }
+    }
+  ],
+  "$defs": {
+    "actor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "id"],
+      "properties": {
+        "type": { "type": "string", "enum": ["agent", "skill", "orchestrator", "human", "policy"] },
+        "id": { "type": "string", "minLength": 1 }
+      }
+    }
+  }
+}

@@ -1,0 +1,32 @@
+{
+  "decision_id": "gd-20261120-g4-001",
+  "gate_id": "G4",
+  "task_id": "task-20261120-a1b2c3d4",
+  "workflow_id": "feature-development",
+  "node_id": "code_review",
+  "required": true,
+  "status": "PASSED",
+  "subject_type": "commit",
+  "subject_hash": "2222222222222222222222222222222222222222",
+  "automated_checks": [
+    {
+      "name": "diff-review",
+      "status": "passed",
+      "evidence_ref": "ev-20261120-0004",
+      "details": "独立 Reviewer 审查 diff；无严重问题。"
+    },
+    {
+      "name": "secret-scan",
+      "status": "passed",
+      "evidence_ref": "ev-20261120-0005",
+      "details": "未发现凭证。"
+    }
+  ],
+  "approval_ref": null,
+  "decision_reason": "独立 Code Review 通过，审查对象与当前 commit 一致。",
+  "decided_by": "system",
+  "decided_at": "2026-11-20T10:25:00Z",
+  "expires_at": null,
+  "evidence_refs": ["ev-20261120-0004", "ev-20261120-0005"],
+  "invalidation_reason": null
+}

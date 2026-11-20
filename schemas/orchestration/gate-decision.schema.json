@@ -1,0 +1,73 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sdd.local/schemas/orchestration/gate-decision.schema.json",
+  "title": "SDDGateDecision",
+  "description": "G1–G6 编排层 GateDecision（规则权威为 ADR-006）",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "decision_id", "gate_id", "task_id", "workflow_id", "node_id",
+    "required", "status", "subject_type", "automated_checks",
+    "decision_reason", "decided_by", "decided_at", "evidence_refs"
+  ],
+  "properties": {
+    "decision_id": { "type": "string", "minLength": 1 },
+    "gate_id": { "type": "string", "enum": ["G1", "G2", "G3", "G4", "G5", "G6"] },
+    "task_id": { "type": "string", "pattern": "^task-[0-9]{8}-[a-z0-9]{4,36}$" },
+    "workflow_id": { "type": "string", "pattern": "^[a-z][a-z0-9-]{1,63}$" },
+    "node_id": { "type": "string", "pattern": "^[a-z][a-z0-9_-]{1,63}$" },
+    "required": { "type": "boolean" },
+    "status": {
+      "type": "string",
+      "enum": ["NOT_REQUIRED", "PENDING", "EVALUATING", "PASSED", "FAILED", "BLOCKED", "INVALIDATED", "EXPIRED"]
+    },
+    "subject_type": { "type": "string", "enum": ["commit", "artifact", "task", "other"] },
+    "subject_hash": { "type": ["string", "null"] },
+    "automated_checks": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/automatedCheck" }
+    },
+    "approval_ref": { "type": ["string", "null"] },
+    "decision_reason": { "type": "string", "minLength": 1 },
+    "decided_by": { "type": "string", "minLength": 1 },
+    "decided_at": { "type": "string", "format": "date-time" },
+    "expires_at": { "type": ["string", "null"], "format": "date-time" },
+    "evidence_refs": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
+    "invalidation_reason": { "type": ["string", "null"] }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "status": { "const": "PASSED" } }, "required": ["status"] },
+      "then": {
+        "properties": {
+          "subject_hash": { "type": "string", "minLength": 1 },
+          "automated_checks": { "minItems": 1 },
+          "evidence_refs": { "minItems": 1 }
+        },
+        "required": ["subject_hash"]
+      }
+    },
+    {
+      "if": { "properties": { "gate_id": { "const": "G6" } }, "required": ["gate_id"] },
+      "then": {
+        "properties": {
+          "subject_type": { "const": "commit" }
+        },
+        "required": ["subject_hash"]
+      }
+    }
+  ],
+  "$defs": {
+    "automatedCheck": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "status"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "status": { "type": "string", "enum": ["passed", "failed", "skipped", "blocked"] },
+        "evidence_ref": { "type": ["string", "null"] },
+        "details": { "type": "string" }
+      }
+    }
+  }
+}

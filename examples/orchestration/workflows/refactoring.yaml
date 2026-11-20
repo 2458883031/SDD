@@ -1,0 +1,86 @@
+schema_version: 1
+id: refactoring
+version: "0.1.0"
+name: 系统重构
+description: 系统级重构流程，包含设计确认、计划确认、独立 Review、测试和回归验证。
+status: draft
+trigger:
+  task_types: [system_refactoring]
+  complexity: [L3]
+  risk_levels: [high, critical]
+  environments: [dev, test, staging, prod]
+  change_types: [code, config]
+policies:
+  max_concurrency: 5
+  failure_policy: fail_workflow
+  evidence_level: strict
+nodes:
+  - id: requirements
+    type: skill
+    skill: requirements-clarity
+    outputs:
+      - name: requirements
+  - id: g1
+    type: gate
+    gate: G1
+    depends_on: [requirements]
+  - id: analysis
+    type: skill
+    skill: analysis
+    depends_on: [g1]
+    outputs:
+      - name: analysis
+  - id: design
+    type: skill
+    skill: design
+    depends_on: [analysis]
+    outputs:
+      - name: design
+  - id: g2
+    type: gate
+    gate: G2
+    description: 设计确认，包含独立 Builder Check、迁移与回滚方案。
+    depends_on: [design]
+  - id: g3
+    type: gate
+    gate: G3
+    depends_on: [g2]
+  - id: coding
+    type: skill
+    skill: coding
+    depends_on: [g3]
+    outputs:
+      - name: implementation
+  - id: code_review
+    type: skill
+    skill: code-review
+    depends_on: [coding]
+    gate: G4
+    parallel_group: quality
+    outputs:
+      - name: review-report
+  - id: testing
+    type: skill
+    skill: testing
+    depends_on: [coding]
+    gate: G5
+    parallel_group: quality
+    outputs:
+      - name: test-report
+  - id: quality_gate
+    type: gate
+    gates: [G4, G5]
+    depends_on: [code_review, testing]
+  - id: regression
+    type: check
+    description: 执行回归测试并记录证据。
+    depends_on: [quality_gate]
+  - id: documentation
+    type: skill
+    skill: documentation
+    depends_on: [regression]
+    outputs:
+      - name: technical-docs
+  - id: end
+    type: end
+    depends_on: [documentation]

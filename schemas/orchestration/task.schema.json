@@ -1,0 +1,232 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sdd.local/schemas/orchestration/task.schema.json",
+  "title": "SDDTask",
+  "description": "Orchestration Task 数据模型（P1-002，静态 Schema，不代表 Runtime 已实现）",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "task_id", "run_id", "workflow_id", "workflow_version",
+    "node_id", "task_type", "status", "context_status", "complexity",
+    "risk_level", "permission_level", "inputs", "outputs", "dependencies",
+    "retry_policy", "timeout_policy", "evidence_refs", "idempotency_key",
+    "attempt", "created_at"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "task_id": { "type": "string", "pattern": "^task-[0-9]{8}-[a-z0-9]{4,36}$" },
+    "parent_task_id": { "type": ["string", "null"] },
+    "run_id": { "type": "string", "minLength": 1 },
+    "workflow_id": { "type": "string", "pattern": "^[a-z][a-z0-9-]{1,63}$" },
+    "workflow_version": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(?:-[0-9A-Za-z.-]+)?(?:\\+[0-9A-Za-z.-]+)?$"
+    },
+    "node_id": { "type": "string", "pattern": "^[a-z][a-z0-9_-]{1,63}$" },
+    "task_type": {
+      "type": "string",
+      "enum": [
+        "technical_consultation", "simple_change", "bug_fix",
+        "feature_development", "system_refactoring", "new_project",
+        "testing_task", "deployment_task", "documentation_task"
+      ]
+    },
+    "status": {
+      "type": "string",
+      "enum": ["PENDING", "READY", "RUNNING", "WAITING", "BLOCKED", "SUCCEEDED", "FAILED", "CANCELLED"]
+    },
+    "context_status": {
+      "type": "string",
+      "enum": ["created", "planned", "executing", "awaiting_approval", "verifying", "completed", "failed", "aborted"]
+    },
+    "complexity": { "type": "string", "enum": ["L1", "L2", "L3"] },
+    "risk_level": { "type": "string", "enum": ["low", "medium", "high", "critical"] },
+    "permission_level": { "type": "string", "enum": ["R0", "R1", "R2", "R3", "R4"] },
+    "inputs": { "type": "array", "items": { "$ref": "#/$defs/artifactRef" }, "uniqueItems": true },
+    "outputs": { "type": "array", "items": { "$ref": "#/$defs/artifactRef" }, "uniqueItems": true },
+    "dependencies": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "type": "string", "pattern": "^task-[0-9]{8}-[a-z0-9]{4,36}$" }
+    },
+    "assigned_agent": {
+      "oneOf": [
+        { "type": "null" },
+        { "$ref": "#/$defs/agentRef" }
+      ]
+    },
+    "assigned_skill": {
+      "oneOf": [
+        { "type": "null" },
+        { "$ref": "#/$defs/skillRef" }
+      ]
+    },
+    "retry_policy": { "$ref": "#/$defs/retryPolicy" },
+    "timeout_policy": { "$ref": "#/$defs/timeoutPolicy" },
+    "approval_requirement": {
+      "oneOf": [
+        { "type": "null" },
+        { "$ref": "#/$defs/approvalRequirement" }
+      ]
+    },
+    "evidence_refs": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
+    "idempotency_key": { "type": "string", "minLength": 1, "maxLength": 200 },
+    "subject_hash": { "type": ["string", "null"] },
+    "attempt": { "type": "integer", "minimum": 1 },
+    "lease": {
+      "oneOf": [
+        { "type": "null" },
+        { "$ref": "#/$defs/lease" }
+      ]
+    },
+    "error": {
+      "oneOf": [
+        { "type": "null" },
+        { "$ref": "#/$defs/error" }
+      ]
+    },
+    "created_at": { "type": "string", "format": "date-time" },
+    "started_at": { "type": ["string", "null"], "format": "date-time" },
+    "completed_at": { "type": ["string", "null"], "format": "date-time" },
+    "metadata": { "type": "object" }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "status": { "const": "SUCCEEDED" } }, "required": ["status"] },
+      "then": {
+        "properties": {
+          "outputs": { "minItems": 1 },
+          "completed_at": { "type": "string", "format": "date-time" }
+        },
+        "required": ["completed_at"]
+      }
+    },
+    {
+      "if": { "properties": { "status": { "const": "FAILED" } }, "required": ["status"] },
+      "then": {
+        "properties": { "error": { "type": "object" } },
+        "required": ["error"]
+      }
+    },
+    {
+      "if": { "properties": { "status": { "const": "RUNNING" } }, "required": ["status"] },
+      "then": {
+        "properties": { "started_at": { "type": "string", "format": "date-time" } },
+        "required": ["started_at"]
+      }
+    }
+  ],
+  "$defs": {
+    "artifactRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "version", "sha256", "type"],
+      "properties": {
+        "path": { "type": "string", "pattern": "^artifacts/task-[^/]+/.+$" },
+        "version": { "type": "integer", "minimum": 1 },
+        "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "type": {
+          "type": "string",
+          "enum": ["requirements", "analysis", "design", "plan", "implementation", "review", "test", "deployment", "report", "other"]
+        }
+      }
+    },
+    "agentRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "role"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "role": { "type": "string", "minLength": 1 }
+      }
+    },
+    "skillRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "version"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "version": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(?:-[0-9A-Za-z.-]+)?(?:\\+[0-9A-Za-z.-]+)?$"
+        }
+      }
+    },
+    "retryPolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["max_attempts", "backoff"],
+      "properties": {
+        "max_attempts": { "type": "integer", "minimum": 1, "maximum": 10 },
+        "backoff": { "type": "string", "enum": ["fixed", "exponential"] },
+        "initial_delay_seconds": { "type": "integer", "minimum": 0 },
+        "max_delay_seconds": { "type": "integer", "minimum": 0 },
+        "jitter": { "type": "boolean" },
+        "retry_budget_seconds": { "type": "integer", "minimum": 0 },
+        "retry_on": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string", "enum": ["retryable", "timeout", "agent_unavailable", "tool_error"] }
+        },
+        "non_retryable": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string", "enum": ["non_retryable", "permission_denied", "input_invalid", "irreversible"] }
+        }
+      }
+    },
+    "timeoutPolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["timeout_seconds", "on_timeout"],
+      "properties": {
+        "timeout_seconds": { "type": "integer", "minimum": 1 },
+        "on_timeout": { "type": "string", "enum": ["fail", "block", "cancel"] },
+        "heartbeat_seconds": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "approvalRequirement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type"],
+      "properties": {
+        "type": { "type": "string", "enum": ["gate", "sa", "both"] },
+        "gate": { "type": "string", "enum": ["G1", "G2", "G3", "G4", "G5", "G6"] },
+        "sa": { "type": "boolean" },
+        "reason": { "type": "string" },
+        "expires_in_seconds": { "type": "integer", "minimum": 1 },
+        "approver_role": { "type": "string" }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "type": { "enum": ["gate", "both"] } }, "required": ["type"] },
+          "then": { "required": ["gate"] }
+        }
+      ]
+    },
+    "lease": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["owner", "expires_at"],
+      "properties": {
+        "owner": { "type": "string", "minLength": 1 },
+        "expires_at": { "type": "string", "format": "date-time" }
+      }
+    },
+    "error": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "message", "category", "retryable"],
+      "properties": {
+        "code": { "type": "string", "minLength": 1 },
+        "message": { "type": "string", "minLength": 1 },
+        "category": {
+          "type": "string",
+          "enum": ["retryable", "non_retryable", "needs_human", "needs_replan", "terminal", "duplicate"]
+        },
+        "retryable": { "type": "boolean" },
+        "details": { "type": "object" }
+      }
+    }
+  }
+}
