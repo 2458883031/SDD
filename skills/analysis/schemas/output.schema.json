@@ -327,9 +327,11 @@
         "resolution_evidence_refs": {
           "type": "array",
           "items": {
-            "type": "string",
-            "pattern": "[a-f0-9]{64}",
-            "description": "必须包含不可变 SHA-256；不得使用纯 path 或普通来源登记"
+            "oneOf": [
+              { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+              { "type": "string", "pattern": "^(?!(?:.*[a-f0-9]{64}){2}).+@[0-9]+#[a-f0-9]{64}$" }
+            ],
+            "description": "裸 SHA-256 或 path@version#sha256；SHA 必须为小写、恰好一个且位于末尾，多重摘要/路径内额外摘要均拒绝"
           }
         },
         "rationale": { "type": "string" }

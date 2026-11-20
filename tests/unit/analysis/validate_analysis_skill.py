@@ -138,14 +138,23 @@ def analysis_ref_exists(ref, analysis, candidate_ids, risk_ids, design_considera
     return ref in candidate_ids or ref in risk_ids or ref in design_considerations
 
 
-SHA256_RE = re.compile(r"[a-f0-9]{64}")
+BARE_SHA_RE = re.compile(r"^[a-f0-9]{64}$")
+VERSIONED_SHA_RE = re.compile(r"^.+@[0-9]+#[a-f0-9]{64}$")
+HEX64_RE = re.compile(r"[a-f0-9]{64}")
 
 
 def artifact_sha(ref):
+    """Return SHA-256 only for canonical bare or path@version#sha references."""
     if not isinstance(ref, str):
         return None
-    match = SHA256_RE.search(ref)
-    return match.group(0) if match else None
+    if BARE_SHA_RE.fullmatch(ref):
+        return ref
+    if VERSIONED_SHA_RE.fullmatch(ref):
+        # Exactly one 64-hex digest may appear anywhere in the reference.
+        if len(HEX64_RE.findall(ref)) != 1:
+            return None
+        return ref.rsplit("#", 1)[1]
+    return None
 
 
 def is_requirements_ref(ref, analysis):
@@ -570,6 +579,24 @@ expect_schema_invalid(
 expect_schema_invalid(
     "analysis-trace-deferred-no-rationale",
     lambda a: a["requirements_traceability"]["items"][0].update({"disposition": "deferred"}))
+expect_schema_invalid(
+    "analysis-trace-resolved-suffix",
+    lambda a: a["requirements_traceability"]["items"][0].update({
+        "disposition": "resolved",
+        "resolution_evidence_refs": ["path@1#" + "1" * 64 + "x"],
+    }))
+expect_schema_invalid(
+    "analysis-trace-resolved-uppercase",
+    lambda a: a["requirements_traceability"]["items"][0].update({
+        "disposition": "resolved",
+        "resolution_evidence_refs": ["path@1#" + "A" * 64],
+    }))
+expect_schema_invalid(
+    "analysis-trace-resolved-fake-prefix",
+    lambda a: a["requirements_traceability"]["items"][0].update({
+        "disposition": "resolved",
+        "resolution_evidence_refs": ["a" * 64 + "/fake@1#" + "1" * 64],
+    }))
 
 input_bad_ref = copy.deepcopy(load_json(SKILL / "examples" / "example-input.json"))
 input_bad_ref["requirements_ref"]["type"] = "analysis"
@@ -759,7 +786,9 @@ if only_statement_errs:
 fact_ref = "docs/evidence/independent-facts.md@1#" + "d" * 64
 candidate_ref = "docs/evidence/independent-candidate.md@1#" + "e" * 64
 risk_ref = "docs/evidence/independent-risk.md@1#" + "f" * 64
+bare_ref = "c" * 64
 for label, kind, ref in (
+    ("resolved-bare-sha-evidence", "facts", bare_ref),
     ("resolved-fact-evidence", "facts", fact_ref),
     ("resolved-candidate-evidence", "candidate", candidate_ref),
     ("resolved-risk-evidence", "risk", risk_ref),
@@ -797,6 +826,52 @@ for label, kind in (
 ):
     errs = validate_analysis_output(resolved_with_evidence(kind, alias_ref), label, full_input)
     check(bool(errs), f"{label}: expected Requirements alias rejection")
+    if errs:
+        resolved_negative_cases += 1
+
+# F6-A: only canonical bare SHA-256 or path@version#sha256 is accepted.
+# A 64-hex substring before the terminal digest must not be selected as the SHA.
+expect_resolved_failure(
+    "resolved-fake-sha-prefix",
+    "a" * 64 + "/fake@1#" + req_sha,
+)
+expect_resolved_failure(
+    "resolved-two-digests",
+    "docs/copies/requirements-copy.md@1#" + "b" * 64 + "#" + req_sha,
+)
+expect_resolved_failure(
+    "resolved-sha-not-terminal",
+    "docs/copies/requirements-copy.md@1#" + req_sha + "/tail",
+)
+expect_resolved_failure(
+    "resolved-digest-before-reference",
+    "b" * 64 + "/docs/copies/requirements-copy.md@1#" + req_sha,
+)
+expect_resolved_failure(
+    "resolved-sha-extra-suffix",
+    "docs/copies/requirements-copy.md@1#" + req_sha + "x",
+)
+expect_resolved_failure(
+    "resolved-missing-digest",
+    "docs/copies/requirements-copy.md@1#",
+)
+expect_resolved_failure(
+    "resolved-repeated-digest",
+    "docs/copies/requirements-copy.md@1#" + req_sha + "#" + req_sha,
+)
+expect_resolved_failure(
+    "resolved-mixed-case-digest",
+    "docs/copies/requirements-copy.md@1#" + "A" * 32 + "b" * 32,
+)
+
+multi_sha_alias = "a" * 64 + "/docs/copies/requirements-copy.md@1#" + req_sha
+for label, kind in (
+    ("resolved-multi-sha-alias-in-facts", "facts"),
+    ("resolved-multi-sha-alias-in-candidate", "candidate"),
+    ("resolved-multi-sha-alias-in-risk", "risk"),
+):
+    errs = validate_analysis_output(resolved_with_evidence(kind, multi_sha_alias), label, full_input)
+    check(bool(errs), f"{label}: expected multi-SHA alias rejection")
     if errs:
         resolved_negative_cases += 1
 

@@ -170,7 +170,7 @@ Analysis 不得静默丢弃 Requirements 的关键信息。`requirements_traceab
 - `analyzed`：已纳入技术分析；必须提供可解析的 `analysis_refs`（候选方案/风险/设计考虑/技术上下文/问题/可行性/比较维度），不能只加标签；
 - `mapped`：已映射到候选方案/风险/设计考虑，必须提供 `analysis_refs`；
 - `retained`：保留为假设/未知项/问题/非目标等，必须能在实际 Analysis 输出中找到对应内容；Acceptance Criterion retained 时必须在 `next_steps.design_considerations` 中提供 `AC-<id>: <非空 consideration>`，单独的 `AC-<id>`、空考虑或其他 AC 的考虑均不合格；
-- `resolved`：已解决，必须提供 `resolution_evidence_refs`，且引用必须包含不可变 SHA-256（如 `path@version#sha256` 或裸 sha256），只能来自事实 `evidence_refs`、候选方案 `evidence_refs` 或风险 `evidence_refs`；`source_requirements_ref`、普通 `source_refs` 登记、纯 path、`user_stated`/`assumption` statement 均不得充当解决证据；Artifact 身份以 SHA-256 为准，不得通过更换 path 绕过；
+- `resolved`：已解决，必须提供 `resolution_evidence_refs`，且引用必须使用下述规范形式之一、包含不可变 SHA-256，只能来自事实 `evidence_refs`、候选方案 `evidence_refs` 或风险 `evidence_refs`；`source_requirements_ref`、普通 `source_refs` 登记、纯 path、`user_stated`/`assumption` statement 均不得充当解决证据；Artifact 身份以规范解析出的 SHA-256 为准，不得通过更换 path 绕过；
 - `not_applicable` / `deferred`：不适用/延后，必须提供非空 `rationale`。
 
 规则：
@@ -179,9 +179,26 @@ Analysis 不得静默丢弃 Requirements 的关键信息。`requirements_traceab
 2. 不适用/延后必须解释原因；不得静默删除。
 3. `mapped` 的 `analysis_refs` 必须指向存在的候选方案、风险或设计考虑。
 4. `retained` 必须闭环到实际输出：Unknown→`analysis.unknowns`，Assumption→`analysis.assumptions`，Non-goal→`problem_statement.non_goals`，Open Question→`next_steps` 的对应问题，Acceptance Criterion→`next_steps.design_considerations` 的 `AC-<id>: <非空 consideration>`，Constraint/Dependency 等→对应上下文/分析结果。
-5. `resolved` 的证据只接受事实/候选/风险中的显式 evidence_refs，且必须包含不可变 SHA-256；`source_requirements_ref`、普通 source_refs 登记、纯 path、`user_stated`/`assumption` 的普通陈述不得作为解决证据。Artifact 身份以 SHA-256 判定，相同 SHA 的不同 path/目录/文件名仍是同一 Artifact。
+5. `resolved` 的证据只接受事实/候选/风险中的显式 evidence_refs，且必须使用规范引用并包含不可变 SHA-256；`source_requirements_ref`、普通 source_refs 登记、纯 path、`user_stated`/`assumption` 的普通陈述不得作为解决证据。Artifact 身份以规范解析出的 SHA-256 判定，相同 SHA 的不同 path/目录/文件名/别名仍是同一 Artifact。
 6. Requirements Artifact 不被修改；Analysis 不是第二个 Requirements 生产者。
 7. 只做最小追踪，不引入新的全局 Artifact 类型或状态机。
+
+### 4.2 `resolution_evidence_refs` 规范格式
+
+`resolution_evidence_refs` 的每个元素必须完整匹配以下两种规范形式之一：
+
+| 形式 | 规范模式 | 示例 |
+|------|----------|------|
+| 裸 SHA-256 | `^[a-f0-9]{64}$` | `<64 位小写十六进制>` |
+| 版本化引用 | `^(?!(?:.*[a-f0-9]{64}){2}).+@[0-9]+#[a-f0-9]{64}$` | `docs/evidence/facts.md@1#<64 位小写十六进制>` |
+
+约束：
+
+- SHA-256 必须为 **小写**，位于引用的**末尾**，且整个引用中**恰好出现一个** 64 位十六进制摘要；
+- 不接受 `path#sha256`（无 `@version`）作为规范形式；
+- 缺少摘要、摘要后有额外字符、摘要前另有 64 位十六进制片段、重复摘要、多个不同摘要、大写/混合大小写摘要均视为不可解析；
+- 无法规范解析的引用 **fail-closed**：不得作为 `resolved` 证据，不得因其包含某个 64 位子串而被接受；
+- Requirements Artifact 的身份是规范解析出的 SHA-256；同一 SHA-256 配合任何不同 path、目录、文件名或别名，仍是同一 Artifact，不能作为独立证据。
 
 ---
 
