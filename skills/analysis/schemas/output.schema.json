@@ -305,6 +305,45 @@
         "status": { "type": "string", "enum": ["unknown"] }
       }
     },
+    "traceItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source_type", "source_id", "disposition"],
+      "properties": {
+        "source_type": {
+          "type": "string",
+          "enum": [
+            "functional_requirement", "non_functional_requirement", "constraint",
+            "dependency", "assumption", "unknown", "open_question",
+            "acceptance_criterion", "non_goal", "source_ref"
+          ]
+        },
+        "source_id": { "type": "string", "minLength": 1 },
+        "disposition": {
+          "type": "string",
+          "enum": ["analyzed", "mapped", "retained", "resolved", "not_applicable", "deferred"]
+        },
+        "analysis_refs": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "rationale": { "type": "string" }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "disposition": { "enum": ["not_applicable", "deferred"] } }, "required": ["disposition"] },
+          "then": {
+            "properties": { "rationale": { "type": "string", "minLength": 1 } },
+            "required": ["rationale"]
+          }
+        }
+      ]
+    },
+    "requirementsTraceability": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["items"],
+      "properties": {
+        "items": { "type": "array", "items": { "$ref": "#/$defs/traceItem" } }
+      }
+    },
     "analysisData": {
       "type": "object",
       "additionalProperties": false,
@@ -328,6 +367,7 @@
         "facts": { "type": "array", "items": { "$ref": "#/$defs/fact" } },
         "assumptions": { "type": "array", "items": { "$ref": "#/$defs/assumption" } },
         "unknowns": { "type": "array", "items": { "$ref": "#/$defs/unknown" } },
+        "requirements_traceability": { "$ref": "#/$defs/requirementsTraceability" },
         "next_steps": { "$ref": "#/$defs/nextSteps" },
         "single_solution_rationale": { "type": "string" }
       }
@@ -345,7 +385,7 @@
                 "analysis_id", "analysis_version", "source_requirements_ref",
                 "problem_statement", "technical_context", "candidate_solutions",
                 "feasibility_assessment", "risk_assessment", "comparison_matrix",
-                "recommendation", "next_steps"
+                "recommendation", "next_steps", "requirements_traceability"
               ]
             }
           }

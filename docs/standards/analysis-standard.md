@@ -132,6 +132,7 @@ Analysis **不负责**：
 | `facts` | user_stated/evidence_backed 事实 |
 | `assumptions` | unconfirmed 假设 |
 | `unknowns` | 未知项 |
+| `requirements_traceability` | 上游 Requirements 关键条目的处理/追踪关系 |
 | `next_steps` | blocking/non-blocking 问题、证据需求、验证任务、设计考虑 |
 | `single_solution_rationale` | 仅单一候选方案时解释其他方案为何不适用 |
 
@@ -146,6 +147,39 @@ Analysis **不负责**：
 - 分析完成且无 blocking 未决项；
 - **不表示 Design 已批准、G2 已通过、用户已确认**；
 - 推荐不等于设计决策。
+
+### 4.1 Requirements Traceability
+
+Analysis 不得静默丢弃 Requirements 的关键信息。`requirements_traceability.items` 必须为上游关键条目建立处理关系：
+
+| 上游类型 | `source_type` | `source_id` |
+|----------|---------------|-------------|
+| FR | `functional_requirement` | FR ID |
+| NFR | `non_functional_requirement` | NFR ID |
+| 约束 | `constraint` | 约束文本 |
+| 依赖 | `dependency` | DEP ID |
+| 假设 | `assumption` | ASM ID |
+| 未知项 | `unknown` | UNK ID |
+| 未决问题 | `open_question` | Q ID |
+| 验收标准 | `acceptance_criterion` | AC ID 或标准文本 |
+| 非目标 | `non_goal` | 非目标文本 |
+| 来源引用 | `source_ref` | `path@version#sha256` |
+
+`disposition`：
+
+- `analyzed`：已纳入技术分析；
+- `mapped`：已映射到候选方案/风险/设计考虑，必须提供 `analysis_refs`；
+- `retained`：保留为假设/未知项/问题/非目标；
+- `resolved`：已解决并记录依据；
+- `not_applicable` / `deferred`：不适用/延后，必须提供 `rationale`。
+
+规则：
+
+1. 不要求机械复制上游内容；只要求逐项建立处理关系。
+2. 不适用/延后必须解释原因；不得静默删除。
+3. `mapped` 的 `analysis_refs` 必须指向存在的候选方案、风险或设计考虑。
+4. Requirements Artifact 不被修改；Analysis 不是第二个 Requirements 生产者。
+5. 只做最小追踪，不引入新的全局 Artifact 类型或状态机。
 
 ---
 
@@ -302,6 +336,8 @@ Analysis **不负责**：
 - Analysis 完成不等于 Design 已批准、G2 通过或用户确认。
 - `status=ok` 不得包含 blocking 问题/未知项或未解决冲突；可包含非阻塞问题。
 - 部分分析结果允许在 `needs_input`/`blocked` 中返回，但必须明确阻塞原因和需补充信息。
+- 只要输出包含 `data.analysis`，`source_requirements_ref` 必须与输入 `requirements_ref` 完全一致；`ok`、`needs_input`、`needs_approval`、`blocked`、含分析产物的 `failed` 都适用。
+- `status=ok` 的 `artifacts` 至少包含一个 `type=analysis` 的 Artifact；不得用 `source_refs` 替代。部分分析可以按实际产物决定是否生成 Artifact，但不得伪造完成的分析 Artifact。
 
 ---
 
@@ -357,7 +393,9 @@ R2 至少验证：
 9. 阻塞输入不得返回可进入 Design 的 `ok`。
 10. 禁止 implementation_plan/design_spec/design_approved/gate_approved/confirmation_ref。
 11. Artifact version/hash/source。
-12. R1/P1-001/P1-002 回归；链接/JSON/YAML/重复键。
+12. Requirements traceability：FR/NFR/constraints/dependencies/assumptions/unknowns/open_questions/acceptance_criteria/non_goals/source_refs 不缺项，不适用/延后有理由。
+13. 所有含 `data.analysis` 的状态执行来源绑定；`ok` 必须有 analysis Artifact。
+14. R1/P1-001/P1-002 回归；链接/JSON/YAML/重复键。
 
 **运行时状态：** `runtime_behavior = NOT_EXECUTED`。本文件是标准与静态契约，不代表 Analysis Runtime 已实现。
 

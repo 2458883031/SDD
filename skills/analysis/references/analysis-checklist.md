@@ -4,6 +4,9 @@
 
 - [ ] `requirements_ref` 存在且 type=requirements；Requirements 内容通过 R1 Schema；
 - [ ] 上游 Requirements 没有 blocking 未决项/未解决冲突，或已返回 `needs_input`/`blocked`；
+- [ ] 所有含 `data.analysis` 的状态，`source_requirements_ref` 与输入 `requirements_ref` 完全一致；
+- [ ] `requirements_traceability` 覆盖 FR/NFR/constraints/dependencies/assumptions/unknowns/open_questions/acceptance_criteria/non_goals/source_refs；不适用/延后有理由；
+- [ ] `status=ok` 至少包含一个 type=analysis 的 Artifact；不得用 source_refs 替代 artifacts；
 - [ ] Problem Statement 覆盖问题、目标、范围、非目标、约束、已知条件；
 - [ ] Technical Context 覆盖技术栈、结构、外部系统、依赖、数据/运行环境、限制、unknown；
 - [ ] 至少一个候选方案；单方案时解释其他方案为何不适用/不可行；

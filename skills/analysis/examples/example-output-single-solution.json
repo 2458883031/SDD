@@ -374,7 +374,48 @@
           "保持查询接口向后兼容"
         ]
       },
-      "single_solution_rationale": "只有扩展现有搜索接口一个可行方案；新增独立搜索服务超出当前范围和成本。"
+      "single_solution_rationale": "只有扩展现有搜索接口一个可行方案；新增独立搜索服务超出当前范围和成本。",
+      "requirements_traceability": {
+        "items": [
+          {
+            "source_type": "functional_requirement",
+            "source_id": "FR-1",
+            "disposition": "mapped",
+            "analysis_refs": [
+              "SOL-A"
+            ]
+          },
+          {
+            "source_type": "constraint",
+            "source_id": "复用现有搜索索引",
+            "disposition": "analyzed",
+            "analysis_refs": [
+              "SOL-A"
+            ]
+          },
+          {
+            "source_type": "acceptance_criterion",
+            "source_id": "AC-1",
+            "disposition": "mapped",
+            "analysis_refs": [
+              "SOL-A"
+            ]
+          },
+          {
+            "source_type": "non_goal",
+            "source_id": "不增加全文检索服务",
+            "disposition": "retained"
+          },
+          {
+            "source_type": "source_ref",
+            "source_id": "artifacts/task-20261120-an0002/requirements/requirements.md@1#2222222222222222222222222222222222222222222222222222222222222222",
+            "disposition": "analyzed",
+            "analysis_refs": [
+              "SOL-A"
+            ]
+          }
+        ]
+      }
     }
   },
   "artifacts": [

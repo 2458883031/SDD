@@ -73,12 +73,14 @@ Requirements 内容由 `skills/requirements-clarity/schemas/output.schema.json` 
 遵循 `schemas/output.schema.json` 的统一信封：
 
 - `status`: `ok | needs_input | needs_approval | blocked | failed`
-- `data.analysis`: 分析结果（problem/technical/candidates/feasibility/risks/comparison/recommendation/facts/assumptions/unknowns/next_steps）
-- `artifacts`: Analysis Artifact 引用（path/version/sha256/type=analysis）
+- `data.analysis`: 分析结果（problem/technical/candidates/feasibility/risks/comparison/recommendation/facts/assumptions/unknowns/requirements_traceability/next_steps）
+- `artifacts`: Analysis Artifact 引用（path/version/sha256/type=analysis）；`status=ok` 至少一个 analysis Artifact
 - `errors`: 标准错误对象；`failed` 时至少一个
 - `evidence`: 证据引用
 
 禁止字段：`implementation_plan`、`design_spec`、`design_approved`、`gate_approved`、`confirmation_ref`。
+
+所有包含 `data.analysis` 的状态都必须满足 `source_requirements_ref == input.requirements_ref`。`requirements_traceability` 必须为上游 FR/NFR/constraints/dependencies/assumptions/unknowns/open_questions/acceptance_criteria/non_goals/source_refs 建立保留/分析/映射/不适用关系；不适用或延后必须说明原因。
 
 ## 异常处理
 
@@ -104,7 +106,9 @@ Requirements 内容由 `skills/requirements-clarity/schemas/output.schema.json` 
 ## 验收标准
 
 - [ ] 输出通过 `output.schema.json`；
-- [ ] Requirements 来源引用和版本可追溯；
+- [ ] Requirements 来源引用和版本可追溯；所有含 analysis 的状态来源一致；
+- [ ] `requirements_traceability` 覆盖上游关键条目，不适用/延后有理由；
+- [ ] `status=ok` 至少包含一个 type=analysis 的 Artifact；
 - [ ] 问题/技术上下文/候选方案/可行性/风险/比较/推荐/下一步完整；
 - [ ] 事实、证据、假设、未知项严格区分；
 - [ ] 推荐引用存在，推荐≠设计批准；

@@ -70,6 +70,88 @@ def requirement_blocking(req):
     )
 
 
+def ref_key(ref):
+    if not isinstance(ref, dict):
+        return ""
+    return f"{ref.get('path')}@{ref.get('version')}#{ref.get('sha256')}"
+
+
+def upstream_items(req):
+    if not isinstance(req, dict):
+        return set()
+    items = set()
+    for fr in req.get("functional_requirements", []) or []:
+        if fr.get("id"):
+            items.add(("functional_requirement", fr["id"]))
+    for nfr in req.get("non_functional_requirements", []) or []:
+        if nfr.get("id"):
+            items.add(("non_functional_requirement", nfr["id"]))
+    for value in req.get("constraints", []) or []:
+        if isinstance(value, str) and value:
+            items.add(("constraint", value))
+    for dep in req.get("dependencies", []) or []:
+        if dep.get("id"):
+            items.add(("dependency", dep["id"]))
+    for assumption in req.get("assumptions", []) or []:
+        if assumption.get("id"):
+            items.add(("assumption", assumption["id"]))
+    for unknown in req.get("unknowns", []) or []:
+        if unknown.get("id"):
+            items.add(("unknown", unknown["id"]))
+    for question in req.get("open_questions", []) or []:
+        if question.get("id"):
+            items.add(("open_question", question["id"]))
+    for criterion in req.get("acceptance_criteria", []) or []:
+        if isinstance(criterion, dict) and criterion.get("id"):
+            items.add(("acceptance_criterion", criterion["id"]))
+        elif isinstance(criterion, str) and criterion:
+            items.add(("acceptance_criterion", criterion))
+    for non_goal in req.get("non_goals", []) or []:
+        if isinstance(non_goal, str) and non_goal:
+            items.add(("non_goal", non_goal))
+    for source_ref in req.get("source_refs", []) or []:
+        key = ref_key(source_ref)
+        if key:
+            items.add(("source_ref", key))
+    return items
+
+
+def traceability_errors(analysis, input_obj):
+    if not isinstance(analysis, dict):
+        return []
+    trace = analysis.get("requirements_traceability")
+    if not isinstance(trace, dict) or not isinstance(trace.get("items"), list):
+        return ["requirements_traceability missing"]
+    errs = []
+    trace_items = trace.get("items") or []
+    seen = set()
+    candidate_ids = {c.get("solution_id") for c in analysis.get("candidate_solutions", []) or []}
+    risk_ids = {r.get("risk_id") for r in analysis.get("risk_assessment", []) or []}
+    design_considerations = set((analysis.get("next_steps") or {}).get("design_considerations", []) or [])
+    for item in trace_items:
+        key = (item.get("source_type"), item.get("source_id"))
+        if key in seen:
+            errs.append(f"duplicate trace item {key}")
+        seen.add(key)
+        disposition = item.get("disposition")
+        if disposition in {"not_applicable", "deferred"} and not item.get("rationale"):
+            errs.append(f"trace item {key} requires rationale for {disposition}")
+        if disposition == "mapped":
+            refs = item.get("analysis_refs", []) or []
+            if not refs:
+                errs.append(f"mapped trace item {key} requires analysis_refs")
+            for ref in refs:
+                if ref not in candidate_ids and ref not in risk_ids and ref not in design_considerations:
+                    errs.append(f"trace item {key} references unknown analysis object {ref}")
+    input_req = input_obj.get("requirements") if isinstance(input_obj, dict) else None
+    if isinstance(input_req, dict):
+        required = upstream_items(input_req)
+        missing = required - seen
+        if missing:
+            errs.append(f"upstream items not traced: {sorted(missing)}")
+    return errs
+
+
 def validate_analysis_input(inp, label, input_validator, req_validator):
     errs = schema_errors(input_validator, inp)
     result = [f"{label}: input schema: {e.message}" for e in errs]
@@ -106,13 +188,29 @@ def validate_analysis_output(obj, label, input_obj=None):
         if forbidden in analysis:
             errs.append(f"{label}: forbidden field {forbidden} in analysis")
 
+    # F2: apply the same source binding rule to every status that carries analysis.
+    source_ref = analysis.get("source_requirements_ref")
+    if isinstance(input_obj, dict):
+        input_ref = input_obj.get("requirements_ref")
+        if isinstance(input_ref, dict) and source_ref != input_ref:
+            errs.append(f"{label}: source_requirements_ref does not match input requirements_ref")
+
+    trace = analysis.get("requirements_traceability")
+    if obj.get("status") == "ok":
+        artifacts = obj.get("artifacts", []) or []
+        if not any(a.get("type") == "analysis" for a in artifacts):
+            errs.append(f"{label}: ok output requires an analysis artifact")
+        errs.extend(traceability_errors(analysis, input_obj))
+    elif isinstance(trace, dict):
+        errs.extend(traceability_errors(analysis, input_obj))
+
     if obj.get("status") != "ok":
         return errs
 
     required = [
         "analysis_id", "analysis_version", "source_requirements_ref", "problem_statement",
         "technical_context", "candidate_solutions", "feasibility_assessment", "risk_assessment",
-        "comparison_matrix", "recommendation", "next_steps",
+        "comparison_matrix", "recommendation", "next_steps", "requirements_traceability",
     ]
     for key in required:
         if key not in analysis:
@@ -188,11 +286,7 @@ def validate_analysis_output(obj, label, input_obj=None):
     if next_steps.get("blocking_questions"):
         errs.append(f"{label}: blocking_questions present with status=ok")
 
-    source_ref = analysis.get("source_requirements_ref")
     if isinstance(input_obj, dict):
-        input_ref = input_obj.get("requirements_ref")
-        if isinstance(input_ref, dict) and source_ref != input_ref:
-            errs.append(f"{label}: source_requirements_ref does not match input requirements_ref")
         req = input_obj.get("requirements")
         if isinstance(req, dict):
             if requirement_blocking(req):
@@ -335,6 +429,10 @@ expect_schema_invalid("analysis-risk-missing-basis", lambda a: a["risk_assessmen
 expect_schema_invalid("analysis-design-approved", lambda a: a["recommendation"].update({"recommendation_status": "design_approved"}))
 expect_schema_invalid("analysis-implementation-plan", lambda a: a.update({"implementation_plan": {}}))
 expect_schema_invalid("analysis-cost-missing-basis", lambda a: a["candidate_solutions"][0]["implementation_cost_estimate"].pop("basis"))
+expect_schema_invalid("analysis-missing-traceability", lambda a: a.pop("requirements_traceability"))
+expect_schema_invalid(
+    "analysis-trace-not-applicable-no-rationale",
+    lambda a: a["requirements_traceability"]["items"][0].update({"disposition": "not_applicable"}))
 
 input_bad_ref = copy.deepcopy(load_json(SKILL / "examples" / "example-input.json"))
 input_bad_ref["requirements_ref"]["type"] = "analysis"
@@ -368,6 +466,112 @@ expect_semantic_failure(
     "analysis-unresolved-risk-missing",
     lambda a: a["recommendation"].update({"unresolved_risks": ["RISK-MISSING"]}))
 
+# F1: upstream Requirements traceability for every key category.
+f1_negative_cases = 0
+f1_positive_cases = 0
+full_input = input_objects.get("example-input.json")
+for source_type, label in (
+    ("dependency", "analysis-trace-drop-dependency"),
+    ("unknown", "analysis-trace-drop-nonblocking-unknown"),
+    ("acceptance_criterion", "analysis-trace-drop-acceptance"),
+    ("functional_requirement", "analysis-trace-drop-fr"),
+    ("non_functional_requirement", "analysis-trace-drop-nfr"),
+    ("non_goal", "analysis-trace-drop-non-goal"),
+    ("constraint", "analysis-trace-drop-constraint"),
+):
+    def remove_trace(a, st=source_type):
+        a["requirements_traceability"]["items"] = [
+            item for item in a["requirements_traceability"]["items"]
+            if item.get("source_type") != st
+        ]
+    expect_semantic_failure(label, remove_trace, full_input)
+    f1_negative_cases += 1
+
+def mapped_without_refs(a):
+    for item in a["requirements_traceability"]["items"]:
+        if item.get("disposition") == "mapped":
+            item["analysis_refs"] = []
+            return
+
+expect_semantic_failure("analysis-trace-mapped-without-refs", mapped_without_refs, full_input)
+f1_negative_cases += 1
+
+trace_positive = copy.deepcopy(base)
+for item in trace_positive["data"]["analysis"]["requirements_traceability"]["items"]:
+    if item.get("source_type") == "non_goal":
+        item.update({"disposition": "not_applicable", "rationale": "该非目标不影响本次分析"})
+        break
+trace_positive_errs = validate_analysis_output(trace_positive, "analysis-trace-positive-not-applicable", full_input)
+check(not trace_positive_errs, f"analysis-trace-positive-not-applicable: {trace_positive_errs[:3]}")
+if not trace_positive_errs:
+    f1_positive_cases += 1
+
+# F2: source binding on all statuses, not only ok.
+partial_input = load_json(SKILL / "examples" / "example-input-partial.json")
+partial_output = load_json(SKILL / "examples" / "example-output-partial.json")
+f2_cases = 0
+
+def expect_no_semantic_errors(label, obj, inp=None):
+    global f2_cases
+    errs = validate_analysis_output(obj, label, inp)
+    check(not errs, f"{label}: unexpected semantic errors: {errs[:3]}")
+    if not errs:
+        f2_cases += 1
+
+
+def expect_semantic_errors(label, obj, inp=None):
+    global f2_cases
+    errs = validate_analysis_output(obj, label, inp)
+    check(bool(errs), f"{label}: expected semantic failure")
+    if errs:
+        f2_cases += 1
+
+
+expect_no_semantic_errors("needs-input-source-consistent", partial_output, partial_input)
+bad_partial = copy.deepcopy(partial_output)
+bad_partial["data"]["analysis"]["source_requirements_ref"]["path"] = "artifacts/wrong/requirements.md"
+expect_semantic_errors("needs-input-source-inconsistent", bad_partial, partial_input)
+blocked = copy.deepcopy(partial_output)
+blocked["status"] = "blocked"
+blocked["data"] = {"blocked_reason": "上游存在阻塞问题", "analysis": copy.deepcopy(partial_output["data"]["analysis"])}
+expect_no_semantic_errors("blocked-source-consistent", blocked, partial_input)
+blocked_bad = copy.deepcopy(blocked)
+blocked_bad["data"]["analysis"]["source_requirements_ref"]["sha256"] = "f" * 64
+expect_semantic_errors("blocked-source-inconsistent", blocked_bad, partial_input)
+approval = copy.deepcopy(partial_output)
+approval["status"] = "needs_approval"
+approval["data"] = {
+    "approval_request": {"gate_or_sa": "G2", "reason": "需要审批", "impact": "范围", "rollback": "回退"},
+    "analysis": copy.deepcopy(partial_output["data"]["analysis"]),
+}
+approval["data"]["analysis"]["source_requirements_ref"]["version"] = 99
+expect_semantic_errors("needs-approval-source-inconsistent", approval, partial_input)
+ok_bad = copy.deepcopy(base)
+ok_bad["data"]["analysis"]["source_requirements_ref"]["sha256"] = "e" * 64
+expect_semantic_errors("ok-source-inconsistent", ok_bad, full_input)
+failed_with_analysis = {
+    "status": "failed",
+    "data": {"analysis": copy.deepcopy(partial_output["data"]["analysis"])},
+    "artifacts": [],
+    "errors": [{"code": "internal_error", "message": "分析失败"}],
+    "evidence": [],
+}
+expect_no_semantic_errors("failed-source-consistent", failed_with_analysis, partial_input)
+expect_no_semantic_errors("partial-without-artifact", partial_output, partial_input)
+
+# F3: ok status requires a real analysis artifact.
+f3_cases = 0
+for label, mutate in (
+    ("analysis-ok-no-artifact", lambda o: o.update({"artifacts": []})),
+    ("analysis-ok-wrong-artifact-type", lambda o: o["artifacts"][0].update({"type": "report"})),
+):
+    obj = copy.deepcopy(base)
+    mutate(obj)
+    errs = validate_analysis_output(obj, label, full_input)
+    check(bool(errs), f"{label}: expected semantic failure")
+    if errs:
+        f3_cases += 1
+
 if errors:
     print("ANALYSIS VALIDATION FAILED")
     for e in errors:
@@ -378,4 +582,5 @@ print("ANALYSIS VALIDATION PASSED")
 print(f"schemas=2 input_examples={len(input_files)} output_examples={len(output_files)}")
 print(f"input_positive={input_positive} output_positive={output_positive} cases={len(case_list)} invalid_cases={len(invalid_list)}")
 print(f"schema_negative={schema_negative[0]} semantic_negative={semantic_negative[0]}")
+print(f"f1_negative={f1_negative_cases} f1_positive={f1_positive_cases} f2_cases={f2_cases} f3_cases={f3_cases}")
 print("runtime_behavior=NOT_EXECUTED")
