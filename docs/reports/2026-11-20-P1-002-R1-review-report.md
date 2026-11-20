@@ -2,17 +2,19 @@
 
 | 项目 | 内容 |
 |------|------|
-| 任务编号 | P1-002-R1 |
+| 任务编号 | P1-002-R1（含 R1-F2 补充整改） |
 | 目标 PR | **#3** — https://github.com/2458883031/SDD/pull/3 |
 | 分支 | `feature/p1-002-orchestration` |
 | 基线 | `70b8549aff89fa8e1ce5caaf42bd413616d54c92`（main） |
 | R1 实施提交 | `14cd1e0af6775f5dac5df75af24b8b60fa1c5ab7` |
-| 最终实施 HEAD | `14cd1e0af6775f5dac5df75af24b8b60fa1c5ab7` |
-| 报告提交 / 最终 HEAD | 见最终交付说明（报告无法包含自身提交哈希） |
+| R1 报告文件所在提交 | `aa81252bfc1646adf938526e472d2281fc34047c` |
+| R1-F2 实施提交 | `9bc493362609f36bf2eae4db45c15f0f2ce1487d` |
+| R1-F2 报告提交 | 无法在文件内容中预写自身提交 SHA；由最终交付消息提供具体值 |
+| 最终 PR Head | 由最终交付消息提供（报告提交后更新） |
 | 执行/监督 | Claude Code |
-| 当前状态 | **P1-002-R1 Draft（整改提交已推送，PR 未合并，待 ChatGPT 复审）** |
+| 当前状态 | **P1-002-R1-F2 Draft（整改已提交，待推送/复审）** |
 
-> 本轮只针对 ChatGPT 复审提出的 5 项 Major、2 项 Minor 和 Task Context/ADR-005 专项进行修复，不重新实施 P1-002，不修改 main，不创建新 PR，不合并。
+> 本轮在 R1 基础上补充修复 Approval 安全绑定、路径符号链接、DAG 分支终止性、并行汇合、Task Context Schema 约束和报告元数据。不重新设计 P1-002，不修改 main，不创建新 PR，不合并。
 
 ---
 
@@ -276,7 +278,9 @@ workflow_graph_negative=16
 |------|-----|
 | 基线 | `70b8549aff89fa8e1ce5caaf42bd413616d54c92` |
 | R1 实施提交 / 最终实施 HEAD | `14cd1e0af6775f5dac5df75af24b8b60fa1c5ab7` |
-| 报告提交 / 最终 HEAD | 见最终交付说明 |
+| R1 报告文件所在提交 | `aa81252bfc1646adf938526e472d2281fc34047c` |
+| R1-F2 实施提交 | `9bc493362609f36bf2eae4db45c15f0f2ce1487d` |
+| R1-F2 报告提交 / 最终 HEAD | 由最终交付消息提供（无法预写自身提交 SHA） |
 | PR | #3 |
 | PR Base | `main` |
 | PR Head（R1 实施后） | `14cd1e0af6775f5dac5df75af24b8b60fa1c5ab7` |
@@ -458,7 +462,9 @@ R1 实施提交 `14cd1e0`：24 files changed，+806/−127。
 | 提交 | SHA |
 |------|-----|
 | R1 实施提交 | `14cd1e0af6775f5dac5df75af24b8b60fa1c5ab7` |
-| R1 报告提交 | 见最终交付说明 |
+| R1 报告文件所在提交 | `aa81252bfc1646adf938526e472d2281fc34047c` |
+| R1-F2 实施提交 | `9bc493362609f36bf2eae4db45c15f0f2ce1487d` |
+| R1-F2 报告提交 | 由最终交付消息提供（无法预写自身 SHA） |
 | 原 PR Head | `6e321c39fbf45114d3a99b8de9d84cabb6016abf` |
 
 R1 实施后 PR 总提交数：10；报告提交后：11。
@@ -500,4 +506,173 @@ R1 实施后 PR 总提交数：10；报告提交后：11。
 
 ---
 
-**P1-002-R1 状态：** 整改提交已推送，PR #3 未合并，等待 ChatGPT 再次独立复审。未启动 P1-003。
+## 十七、R1-F2 补充整改
+
+### 17.1 问题与整改映射
+
+| 编号 | 问题 | 整改 |
+|------|------|------|
+| F2-M5.1 | Approval `subject_hash` 可单边缺失通过 | 双向绑定：要求上下文绑定时 Approval 必须有非空 hash；一方缺失/为空即拒绝；纯 SA 允许双方均无 |
+| F2-M5.2 | Scope 使用无约束子集匹配，空 Scope 可能被解释为无限授权 | 改为规范化完整 Scope 精确匹配；空 Scope 仅匹配空请求；高风险 SA/G6 必须非空；新增参数/资源/路径/范围扩大/缩小均拒绝 |
+| F2-M5.3 | 过期为字符串比较 | 使用 `datetime.fromisoformat` 解析并统一 UTC；支持 `Z` 与偏移；`now >= expires_at` 即过期 |
+| F2-M5.4 | `ApprovalStore.consume()` 未在临界区验证绑定/有效期 | 临界区内调用完整 `approval_usable()` 校验；并发只成功一次；本地锁不声称分布式保证 |
+| F2-M5.5 | 路径符号链接只匹配完整路径 | 按路径组件逐级解析；相对目标按符号链接所在目录解析；多级/嵌套/循环/绝对/越界拒绝 |
+| F2-m1.1 | DAG 将成功/失败边合并，无法证明每条分支终止 | 分开 success/failure 前向图；成功分支与失败分支分别检查终止；新增互相掩盖负向测试 |
+| F2-m1.2 | 并行汇合只检查共同后代 | join 必须直接依赖全部成员，或明确 `join_policy=quorum` 且满足 quorum；新增缺成员/仅单分支/错误 quorum 负向测试 |
+| F2-Task | Schema 未约束根/节点 Context | 增加 `context_scope`/`workflow_verified` 条件；root 不得有 parent，node 必须有合法 parent；root completed 必须 workflow_verified=true |
+| F2-Report | 报告元数据不完整 | 补充 R1 报告提交 `aa81252`、F2 实施提交 `9bc4933`、PR 统计和最终交付说明 |
+
+### 17.2 Approval 新规则
+
+**subject_hash：**
+
+1. 操作需要代码/产物绑定时，Approval 与上下文都必须有非空且完全一致的 `subject_hash`。
+2. Approval 有 hash、上下文缺失/为空 → 拒绝。
+3. 上下文有 hash、Approval 缺失/为空 → 拒绝。
+4. 仅纯操作（明确不涉及代码/产物）允许双方均无 hash。
+5. G4/G5/G6 相关 Approval 自动要求 hash，即使调用方未传 `subject_required`。
+
+**Scope：**
+
+- 完整 Scope 规范化后精确匹配（JSON 键排序）。
+- 空 Scope 只匹配空请求，不是无限授权。
+- 高风险 SA/G6 必须非空 Scope。
+- 新增参数、资源变化、路径变化、范围扩大、范围缩小、超集/子集均拒绝，必须重新审批。
+
+**时间与消费：**
+
+- `expires_at`/`now` 解析为 UTC；临界时刻 `now == expires_at` 即过期。
+- 消费临界区内验证全部绑定；并发消费只成功一次；第二次失败。
+- 本地线程锁仅用于静态测试，不代表生产级分布式原子保证。
+
+### 17.3 符号链接解析策略
+
+`normalize_path()` 按路径组件逐级解析：
+
+1. 拒绝绝对路径、Windows 盘符路径和初始 `..` 越界。
+2. 遇到组件级符号链接时，目标相对于符号链接所在目录解析。
+3. 替换后从当前位置继续解析，支持多级/嵌套符号链接。
+4. 使用 seen 集合与最大跳数检测循环。
+5. 最终规范化路径必须位于 `artifacts/{task_id}/`。
+6. 覆盖目录本身、目录子文件、多级链、嵌套、循环、相对越界、绝对目标、其他 Task、项目外路径。
+
+本阶段仍是静态安全模型，**不声称实现 OS 级沙箱或运行时文件系统安全**。
+
+### 17.4 Workflow 分支与并行汇合规则
+
+- 成功前向图：依赖边 + `on_success`。
+- 失败前向图：依赖边 + `on_success` + `on_failure`。
+- 每个 success-reachable 节点必须能沿成功边到达 `end`。
+- 每个已声明 `on_failure` 目标必须能沿失败/后续边到达 `end`。
+- 失败分支不能由成功分支的可达性掩盖，反之亦然。
+- `parallel_group` 的 join 必须直接依赖全部成员；`join_policy=quorum` 时必须满足 quorum，且 quorum 不超过成员数。
+- 仅存在共同后代、但 join 不等待全部成员，视为无效汇合。
+
+### 17.5 Task Context Schema 差异
+
+| 约束 | 规则 |
+|------|------|
+| root + parent_task_id | 必须为空/省略 |
+| node + parent_task_id | 必须存在，格式 `task-YYYYMMDD-<id>` |
+| node + context_status=verifying | 拒绝（verifying 属于 Workflow 级） |
+| root + context_status=completed | 必须 `workflow_verified=true` |
+| node SUCCEEDED | 只更新本地 completed，不改变 root executing/verifying |
+| root completed | 仅在 Workflow 验证 + 必需 Gate 通过后 |
+
+新增示例：`task-root-running.json`、`task-root-completed.json`、`approval-pure-sa.json`。
+
+### 17.6 F2 测试统计
+
+| 类别 | 数量 |
+|------|------|
+| Schema 正向 | 24 |
+| Schema 负向 | 30 |
+| Workflow DAG 正向 | 10 |
+| Workflow DAG 负向 | 21 |
+| 状态机合法转换 | 77 |
+| 状态机非法状态对 | 245 |
+| 状态转换实际测试 | 322 |
+| Guard 条件 | 18 |
+| Approval 用例 | 48 |
+| Scope 用例 | 12 |
+| 过期用例 | 6 |
+| 路径安全用例 | 12 |
+| DAG 分支用例 | 4 |
+| 并行汇合用例 | 6 |
+| Task Context 用例 | 11 |
+| 并行用例 | 19 |
+| Gate 用例 | 15 |
+| 失败恢复用例 | 16 |
+| 安全用例 | 71 |
+
+### 17.7 F2 实际测试输出
+
+```text
+ORCHESTRATION VALIDATION PASSED
+schemas=5 state_machines=5
+examples: workflows=10 tasks=5 gates=3 approvals=3 evidence=3
+schema_positive=24 schema_negative=30
+workflow_graph_positive=10 workflow_graph_negative=21
+state_transitions_positive=77 state_transitions_negative=245
+transition_definitions=77 transition_tests=322 guard_cases=18
+parallel_cases=19 task_context_cases=11 gate_cases=15
+approval_cases=48 scope_cases=12 expiry_cases=6 path_cases=12
+dag_branch_cases=4 parallel_join_cases=6
+failure_cases=16 security_cases=71
+yaml_blocks_checked=9 registry_ids=7
+runtime_behavior=NOT_EXECUTED
+```
+
+P1-001 参考 Skill 校验器：
+
+```text
+REFERENCE SKILL VALIDATION PASSED
+structure=passed schema=Draft202012 examples_in=1 examples_out=5
+cases_input_validated=6 invalid_cases_rejected=3
+semver_valid=6 semver_invalid=6
+yaml_blocks_checked=9 metadata_examples=1 registry_ids=7
+negative_metadata_cases_passed=5
+optional_positive_cases_passed=2 optional_negative_cases_passed=9
+runtime_behavior=NOT_EXECUTED platform_entries=1
+```
+
+其他检查：
+
+- Markdown 链接：59 个文件 0 断链；
+- 围栏：无未闭合；
+- 全仓 JSON/YAML 解析：无错误；
+- 重复键 Loader：生效；
+- P0 ADR-001–008：未修改。
+
+### 17.8 F2 修改文件
+
+R1-F2 实施提交 `9bc4933`：10 files changed，+737/−132。
+
+- `docs/standards/approval-orchestration-standard.md`
+- `docs/standards/orchestration-state-machine.md`
+- `docs/standards/task-standard.md`
+- `docs/standards/workflow-standard.md`
+- `schemas/orchestration/approval.schema.json`
+- `schemas/orchestration/task.schema.json`
+- `examples/orchestration/approvals/approval-pure-sa.json`（新增）
+- `examples/orchestration/tasks/task-root-running.json`
+- `examples/orchestration/tasks/task-root-completed.json`（新增）
+- `tests/unit/orchestration/validate_orchestration.py`
+
+本报告文件由 R1-F2 报告提交追加。
+
+### 17.9 报告元数据修订
+
+| 项目 | 值 |
+|------|-----|
+| R1 实施提交 | `14cd1e0af6775f5dac5df75af24b8b60fa1c5ab7` |
+| R1 报告文件所在提交 | `aa81252bfc1646adf938526e472d2281fc34047c` |
+| R1-F2 实施提交 | `9bc493362609f36bf2eae4db45c15f0f2ce1487d` |
+| F2 实施后累计 | 12 commits，49 files，+7516/−1 |
+| F2 报告提交后累计 | 13 commits，50 files（报告 +1） |
+| R1-F2 报告提交 SHA | 无法预写自身 SHA；由最终交付消息提供 |
+| 最终 PR Head | 由最终交付消息提供（报告提交后更新） |
+
+---
+
+**P1-002-R1-F2 状态：** 整改提交已创建，待推送并等待 ChatGPT 独立复审。未合并 PR #3，未启动 P1-003。
