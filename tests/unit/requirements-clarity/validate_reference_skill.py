@@ -7,6 +7,7 @@ Three separate layers are reported:
 3. SemVer 2.0.0 positive/negative checks.
 Runtime Skill behavior is NOT executed or claimed as tested.
 """
+import copy
 import json
 import re
 from pathlib import Path
@@ -27,6 +28,15 @@ REGISTRY = {
     "approval-port",
     "result-port",
 }
+REQUIRED_CAPS = (
+    "skill-discovery",
+    "skill-metadata",
+    "tool-invocation",
+    "context-port",
+    "artifact-port",
+    "result-port",
+)
+OPTIONAL_CAPS = {"approval-port"}
 
 
 class UniqueKeyLoader(yaml.SafeLoader):
@@ -57,15 +67,63 @@ def load_yaml(path):
         return yaml.load(f, Loader=UniqueKeyLoader)
 
 
+def validate_metadata_doc(doc, label):
+    """Return semantic errors for a platform metadata document.
+
+    Non-metadata YAML documents (frontmatter, snippets) return [].
+    """
+    if not isinstance(doc, dict) or "skills" not in doc or "platform" not in doc:
+        return []
+    errs = []
+    skills = doc.get("skills")
+    if not isinstance(skills, dict):
+        return [f"{label}: skills must be a mapping"]
+    for skill_name, entry in skills.items():
+        if not isinstance(entry, dict):
+            errs.append(f"{label}/{skill_name}: entry must be a mapping")
+            continue
+        caps = entry.get("capabilities")
+        if not isinstance(caps, dict):
+            errs.append(f"{label}/{skill_name}: missing capabilities")
+        else:
+            unknown = set(caps) - REGISTRY
+            if unknown:
+                errs.append(f"{label}/{skill_name}: unknown capability IDs {sorted(unknown)}")
+            for cap in REQUIRED_CAPS:
+                if caps.get(cap) is not True:
+                    errs.append(f"{label}/{skill_name}: required capability {cap} missing/false")
+            for cap, value in caps.items():
+                if cap not in REGISTRY:
+                    continue
+                if not isinstance(value, bool):
+                    errs.append(f"{label}/{skill_name}: capability {cap} must be boolean")
+            if "approval-port" in caps and not isinstance(caps["approval-port"], bool):
+                errs.append(f"{label}/{skill_name}: approval-port must be boolean")
+        tools = entry.get("invocation", {}).get("tools") if isinstance(entry.get("invocation"), dict) else None
+        if skill_name == "requirements-clarity" and tools != ["read"]:
+            errs.append(f"{label}/{skill_name}: invocation.tools must be ['read']; got {tools!r}")
+        if skill_name == "requirements-clarity" and isinstance(tools, list) and "write" in tools:
+            errs.append(f"{label}/{skill_name}: write must not be exposed as a Skill Tool")
+    return errs
+
+
 def check_yaml_blocks(path):
     text = path.read_text(encoding="utf-8")
     blocks = re.findall(r"```yaml\n(.*?)```", text, re.S)
+    metadata_examples = 0
     for i, block in enumerate(blocks):
         try:
-            list(yaml.load_all(block, Loader=UniqueKeyLoader))
+            docs = list(yaml.load_all(block, Loader=UniqueKeyLoader))
         except Exception as e:
             errors.append(f"{path.name} yaml block {i + 1}: {e}")
-    return len(blocks)
+            continue
+        for doc in docs:
+            errs = validate_metadata_doc(doc, f"{path.name} yaml block {i + 1}")
+            if errs:
+                errors.extend(errs)
+            if isinstance(doc, dict) and "platform" in doc and "skills" in doc:
+                metadata_examples += 1
+    return len(blocks), metadata_examples
 
 
 SEMVER_RE = re.compile(
@@ -164,6 +222,7 @@ for v in semver_invalid:
 
 # 4. Platform metadata
 platform = load_yaml(ROOT / "platforms" / "openclaw" / "skill-metadata.yaml")
+errors.extend(validate_metadata_doc(platform, "platforms/openclaw/skill-metadata.yaml"))
 check(platform.get("platform") == "openclaw", "platform metadata: platform mismatch")
 entry = platform.get("skills", {}).get("requirements-clarity", {})
 for key in ("discovery", "trigger", "requirements", "invocation", "approval", "capabilities"):
@@ -192,10 +251,42 @@ for path in deprecated_files:
     txt = path.read_text(encoding="utf-8")
     check("tool-port" not in txt, f"{path.name}: deprecated capability ID tool-port found")
 
-# 4c. YAML examples in standards must parse and have no duplicate keys
+# 4c. YAML examples in standards must parse, have no duplicate keys,
+# and metadata examples must pass semantic validation.
 yaml_blocks = 0
+metadata_examples = 0
 for path in (ROOT / "docs" / "standards").glob("*.md"):
-    yaml_blocks += check_yaml_blocks(path)
+    count, examples = check_yaml_blocks(path)
+    yaml_blocks += count
+    metadata_examples += examples
+
+# 4d. Negative metadata cases (must fail semantic validation)
+negative_metadata_cases = 0
+base_meta = copy.deepcopy(platform)
+
+def expect_metadata_failure(case_name, mutate, label):
+    global negative_metadata_cases
+    doc = copy.deepcopy(base_meta)
+    mutate(doc)
+    errs = validate_metadata_doc(doc, label + "/" + case_name)
+    check(bool(errs), f"negative metadata case '{case_name}' should fail but passed")
+    if errs:
+        negative_metadata_cases += 1
+
+def entry(doc):
+    return doc["skills"]["requirements-clarity"]
+
+expect_metadata_failure("unknown-capability", lambda d: entry(d)["capabilities"].update({"unknown-cap": True}), "negative")
+expect_metadata_failure("deprecated-tool-port", lambda d: entry(d)["capabilities"].update({"tool-port": True}), "negative")
+expect_metadata_failure("missing-required-capability", lambda d: entry(d)["capabilities"].pop("result-port", None), "negative")
+expect_metadata_failure("write-exposed-as-tool", lambda d: entry(d)["invocation"].update({"tools": ["read", "write"]}), "negative")
+
+# duplicate YAML key must fail the loader
+try:
+    yaml.load("schema_version: 1\nplatform: openclaw\nplatform: openclaw\n", Loader=UniqueKeyLoader)
+    check(False, "negative metadata case 'duplicate-key' should fail but passed")
+except Exception:
+    negative_metadata_cases += 1
 
 if errors:
     print("REFERENCE SKILL VALIDATION FAILED")
@@ -207,5 +298,6 @@ print("REFERENCE SKILL VALIDATION PASSED")
 print(f"structure=passed schema=Draft202012 examples_in={len(example_inputs)} examples_out={len(example_outputs)}")
 print(f"cases_input_validated={len(case_list)} invalid_cases_rejected={len(invalid_list)}")
 print(f"semver_valid={len(semver_valid)} semver_invalid={len(semver_invalid)}")
-print(f"yaml_blocks_checked={yaml_blocks} registry_ids={len(REGISTRY)}")
+print(f"yaml_blocks_checked={yaml_blocks} metadata_examples={metadata_examples} registry_ids={len(REGISTRY)}")
+print(f"negative_metadata_cases_passed={negative_metadata_cases}")
 print(f"runtime_behavior=NOT_EXECUTED platform_entries={len(platform.get('skills', {}))}")

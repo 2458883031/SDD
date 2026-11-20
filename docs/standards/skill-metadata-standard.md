@@ -156,13 +156,14 @@ skills:
       config: []
     invocation:
       mode: native
-      tools: [read, write]
+      tools: [read]
     capabilities:
       skill-discovery: true
       skill-metadata: true
       tool-invocation: true
       context-port: true
       artifact-port: true
+      result-port: true
       approval-port: false
     approval:
       mode: platform
