@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "name": "workflow-run",
+  "initial": "PENDING",
+  "states": ["PENDING", "RUNNING", "WAITING", "BLOCKED", "SUCCEEDED", "FAILED", "CANCELLED"],
+  "terminal": ["SUCCEEDED", "FAILED", "CANCELLED"],
+  "mapping": {
+    "PENDING": "pending",
+    "RUNNING": "running",
+    "WAITING": "paused",
+    "BLOCKED": ["awaiting_approval", "paused"],
+    "SUCCEEDED": "completed",
+    "FAILED": "failed",
+    "CANCELLED": "aborted"
+  },
+  "transitions": [
+    { "from": "PENDING", "to": "RUNNING", "guard": "workflow_valid_and_tasks_planned_and_resources_available" },
+    { "from": "PENDING", "to": "CANCELLED", "guard": "cancel_requested" },
+    { "from": "RUNNING", "to": "WAITING", "guard": "all_runnable_tasks_waiting" },
+    { "from": "RUNNING", "to": "BLOCKED", "guard": "approval_permission_or_capability_block" },
+    { "from": "RUNNING", "to": "SUCCEEDED", "guard": "required_tasks_succeeded_or_allowed_skipped_and_gates_passed" },
+    { "from": "RUNNING", "to": "FAILED", "guard": "critical_task_failed_or_gate_failed_or_policy_terminated" },
+    { "from": "RUNNING", "to": "CANCELLED", "guard": "cancel_requested" },
+    { "from": "WAITING", "to": "RUNNING", "guard": "wait_condition_cleared" },
+    { "from": "WAITING", "to": "BLOCKED", "guard": "approval_permission_or_capability_block" },
+    { "from": "WAITING", "to": "FAILED", "guard": "dependency_failed_or_timeout_exhausted" },
+    { "from": "WAITING", "to": "CANCELLED", "guard": "cancel_requested" },
+    { "from": "BLOCKED", "to": "RUNNING", "guard": "approval_granted_or_permission_capability_restored" },
+    { "from": "BLOCKED", "to": "FAILED", "guard": "block_unrecoverable" },
+    { "from": "BLOCKED", "to": "CANCELLED", "guard": "approval_rejected_or_cancel_requested" }
+  ],
+  "invariants": [
+    "no_transition_from_terminal",
+    "succeeded_requires_required_tasks_and_gates",
+    "failed_requires_failure_evidence",
+    "cancel_propagates_to_running_tasks"
+  ]
+}

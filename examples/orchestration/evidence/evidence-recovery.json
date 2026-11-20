@@ -1,0 +1,24 @@
+{
+  "evidence_id": "ev-20261120-0010",
+  "task_id": "task-20261120-a1b2c3d4",
+  "workflow_id": "feature-development",
+  "node_id": "coding",
+  "type": "recovery",
+  "actor": { "type": "orchestrator", "id": "orchestrator-main" },
+  "skill": { "name": "coding", "version": "0.1.0" },
+  "tool": null,
+  "input_refs": ["artifacts/task-20261120-a1b2c3d4/implementation/change.patch@2"],
+  "output_refs": ["artifacts/task-20261120-a1b2c3d4/implementation/change.patch@3"],
+  "input_summary": "从检查点恢复 coding 任务，验证幂等键和产物 hash。",
+  "subject_hash": "6666666666666666666666666666666666666666",
+  "result": "success",
+  "timestamp": "2026-11-20T10:40:00Z",
+  "redacted": true,
+  "details": {
+    "recovery_point": "checkpoint-3",
+    "retries": 1,
+    "compensation": "none",
+    "previous_evidence_id": "ev-20261120-0001"
+  },
+  "parent_evidence_id": "ev-20261120-0001"
+}

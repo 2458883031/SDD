@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "name": "gate-decision",
+  "initial": "PENDING",
+  "states": ["NOT_REQUIRED", "PENDING", "EVALUATING", "PASSED", "FAILED", "BLOCKED", "INVALIDATED", "EXPIRED"],
+  "terminal": ["NOT_REQUIRED", "INVALIDATED", "EXPIRED"],
+  "transitions": [
+    { "from": "PENDING", "to": "NOT_REQUIRED", "guard": "gate_not_applicable_with_reason" },
+    { "from": "PENDING", "to": "EVALUATING", "guard": "evaluation_started" },
+    { "from": "PENDING", "to": "INVALIDATED", "guard": "subject_changed_or_task_cancelled" },
+    { "from": "PENDING", "to": "EXPIRED", "guard": "evaluation_timeout" },
+    { "from": "EVALUATING", "to": "PASSED", "guard": "checks_passed_and_required_approval_granted_and_evidence_complete" },
+    { "from": "EVALUATING", "to": "FAILED", "guard": "checks_failed_or_approval_rejected" },
+    { "from": "EVALUATING", "to": "BLOCKED", "guard": "waiting_for_approval_or_external_evidence" },
+    { "from": "EVALUATING", "to": "INVALIDATED", "guard": "subject_changed" },
+    { "from": "EVALUATING", "to": "EXPIRED", "guard": "evaluation_timeout" },
+    { "from": "BLOCKED", "to": "EVALUATING", "guard": "approval_or_evidence_received" },
+    { "from": "BLOCKED", "to": "FAILED", "guard": "approval_rejected_or_evidence_unavailable" },
+    { "from": "BLOCKED", "to": "INVALIDATED", "guard": "subject_changed" },
+    { "from": "BLOCKED", "to": "EXPIRED", "guard": "approval_or_evaluation_timeout" },
+    { "from": "PASSED", "to": "INVALIDATED", "guard": "subject_hash_changed" },
+    { "from": "PASSED", "to": "EXPIRED", "guard": "decision_expired" },
+    { "from": "FAILED", "to": "INVALIDATED", "guard": "subject_changed_or_new_evaluation" }
+  ],
+  "invariants": [
+    "no_transition_from_terminal_except_invalidation",
+    "g4_g5_require_same_subject_hash",
+    "g6_requires_human_approval",
+    "decision_is_immutable_new_evaluation_creates_new_decision"
+  ]
+}

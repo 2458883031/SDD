@@ -1,0 +1,29 @@
+schema_version: 1
+id: documentation
+version: "0.1.0"
+name: 文档任务
+description: 文档编写与一致性复核；纯文档 G4/G5 可 N/A，涉及代码示例时按代码变更处理。
+status: draft
+trigger:
+  task_types: [documentation_task]
+  complexity: [L1]
+  risk_levels: [low, medium]
+  environments: [dev, test, staging, prod]
+  change_types: [docs]
+policies:
+  max_concurrency: 2
+  failure_policy: fail_workflow
+  evidence_level: basic
+nodes:
+  - id: draft
+    type: skill
+    skill: documentation
+    outputs:
+      - name: documentation-draft
+  - id: consistency_review
+    type: check
+    description: 检查链接、术语、版本和与现有标准的一致性。
+    depends_on: [draft]
+  - id: end
+    type: end
+    depends_on: [consistency_review]

@@ -1,0 +1,31 @@
+schema_version: 1
+id: consultation
+version: "0.1.0"
+name: 技术咨询
+description: 澄清问题、分析方案并输出有依据的咨询结论；不修改代码。
+status: draft
+trigger:
+  task_types: [technical_consultation]
+  complexity: [L1, L2]
+  risk_levels: [low, medium]
+  environments: [dev, test, staging, prod]
+  change_types: [analysis]
+policies:
+  max_concurrency: 3
+  failure_policy: fail_workflow
+  evidence_level: standard
+nodes:
+  - id: clarify
+    type: skill
+    skill: requirements-clarity
+    outputs:
+      - name: requirements
+  - id: analyze
+    type: skill
+    skill: analysis
+    depends_on: [clarify]
+    outputs:
+      - name: analysis
+  - id: end
+    type: end
+    depends_on: [analyze]

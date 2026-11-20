@@ -474,6 +474,52 @@ builder_check:
 - [x] 编排引擎与 orchestration Skill 边界明确
 - [x] Workflow DAG 执行语义与失败路径明确
 - [x] 门禁规则统一引用 ADR-006
-- [ ] Workflow Schema 定义（P1）
+- [x] P1-002 标准、Schema 与示例落地（见第 10 节；Runtime 未实现）
 - [ ] 编排引擎实现（P2）
 - [ ] 平台适配验证（P7）
+
+## 10. P1-002 规范落地
+
+> P1-002 在保留 §1–§9 P0 语义的前提下，把 Orchestration 的职责、Workflow/Task 模型、状态机、Gate/Approval、失败恢复和证据要求拆成可验证标准。本节只做索引与边界说明，不重复定义规则。
+
+### 10.1 权威文档索引
+
+| 主题 | 权威文档 |
+|------|----------|
+| Orchestrator 职责、组件、运行时模型 | [orchestration-standard.md](../standards/orchestration-standard.md) |
+| 任务类型、复杂度、澄清与升级 | [task-classification-standard.md](../standards/task-classification-standard.md) |
+| Workflow 模型、选择、组合、动态阶段、并行 | [workflow-standard.md](../standards/workflow-standard.md) |
+| Task 数据模型、调度、依赖、重试、取消、恢复 | [task-standard.md](../standards/task-standard.md) |
+| Task/Workflow/Node/Gate/Approval 状态与转换 | [orchestration-state-machine.md](../standards/orchestration-state-machine.md) |
+| G1–G6 在编排中的挂载、质量门禁和 G4/G5 绑定 | [gate-orchestration-standard.md](../standards/gate-orchestration-standard.md) |
+| Approval 对象、生命周期、绑定、过期和失效 | [approval-orchestration-standard.md](../standards/approval-orchestration-standard.md) |
+| 失败分类、重试、补偿与恢复 | [failure-recovery-standard.md](../standards/failure-recovery-standard.md) |
+| 上下文分层、Evidence、日志/事件/审计、观测指标 | [execution-evidence-standard.md](../standards/execution-evidence-standard.md) |
+| Workflow/Task/Gate/Approval/Evidence Schema | `schemas/orchestration/` |
+| 可验证示例 | `examples/orchestration/` |
+| 静态校验器与测试 | `tests/unit/orchestration/` |
+
+### 10.2 Task 执行状态与 ADR-005
+
+P1-002 引入的 Task Execution State（PENDING/READY/RUNNING/WAITING/BLOCKED/SUCCEEDED/FAILED/CANCELLED）是调度器的工作状态，不是对 ADR-005 `task-status` 的替代：
+
+- ADR-005 仍是 Task Context 持久化生命周期和终止状态的权威定义。
+- Workflow Run 拥有独立的根 Task Context；节点级 Task 拥有 scoped Context，`parent_task_id` 指向根任务。
+- Task 模型同时记录 `status`（执行状态）和 `context_status`（ADR-005 投影）。
+- 节点 Task SUCCEEDED 不得把根 Task Context 设置为 completed；根 completed 只在 Workflow 级验证完成后写入。
+- 两者映射和同步规则见 [orchestration-state-machine.md](../standards/orchestration-state-machine.md)。
+- 不新增或修改 ADR-005 的 `created/planned/executing/awaiting_approval/verifying/completed/failed/aborted` 语义。
+
+### 10.3 不改变的 P0 规则
+
+1. Orchestration 与 orchestration Skill 的边界不变：引擎负责调度，Skill 只是可选入口。
+2. G1–G6 的唯一权威定义仍是 ADR-006；P1-002 只定义编排挂载和 GateDecision 记录。
+3. R0–R4、SA、G6 的职责分离不变：G6 不是权限检查，R4 不等于 G6，SA 不替代权限检查。
+4. G4/G5 必须针对同一 commit/产物 hash；Coding 新版本使旧结果失效。
+5. 生产部署才触发 G6；非生产部署和生产环境非部署变更不触发 G6。
+6. 失败、审批暂停和恢复不得把超时/沉默当作批准。
+7. 本阶段只交付静态标准、Schema、示例和测试；`runtime_behavior = NOT_EXECUTED`。
+
+---
+
+**P1-002 状态：** 规范与静态 Schema 产出，待 ChatGPT 评审。未实现编排引擎、WorkflowRunner、GateController 或 ArtifactManager。

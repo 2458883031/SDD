@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "name": "task-execution",
+  "initial": "PENDING",
+  "states": ["PENDING", "READY", "RUNNING", "WAITING", "BLOCKED", "SUCCEEDED", "FAILED", "CANCELLED"],
+  "terminal": ["SUCCEEDED", "FAILED", "CANCELLED"],
+  "mapping": {
+    "PENDING": ["created", "planned"],
+    "READY": ["planned"],
+    "RUNNING": ["executing"],
+    "WAITING": ["executing"],
+    "BLOCKED": ["awaiting_approval", "executing"],
+    "SUCCEEDED": ["completed"],
+    "FAILED": ["failed"],
+    "CANCELLED": ["aborted"]
+  },
+  "transitions": [
+    { "from": "PENDING", "to": "READY", "guard": "dependencies_satisfied_and_inputs_valid" },
+    { "from": "PENDING", "to": "CANCELLED", "guard": "cancel_requested" },
+    { "from": "READY", "to": "RUNNING", "guard": "assigned_and_lease_acquired_and_permissions_valid" },
+    { "from": "READY", "to": "WAITING", "guard": "no_capacity_or_dependency_wait" },
+    { "from": "READY", "to": "BLOCKED", "guard": "approval_permission_or_capability_block" },
+    { "from": "READY", "to": "CANCELLED", "guard": "cancel_requested" },
+    { "from": "RUNNING", "to": "SUCCEEDED", "guard": "outputs_valid_and_evidence_complete_and_gates_satisfied" },
+    { "from": "RUNNING", "to": "FAILED", "guard": "non_retryable_error_or_retry_exhausted" },
+    { "from": "RUNNING", "to": "WAITING", "guard": "retry_backoff_or_recoverable_pause" },
+    { "from": "RUNNING", "to": "BLOCKED", "guard": "approval_permission_or_capability_block" },
+    { "from": "RUNNING", "to": "CANCELLED", "guard": "cancel_requested_and_execution_stopped" },
+    { "from": "WAITING", "to": "READY", "guard": "wait_condition_cleared" },
+    { "from": "WAITING", "to": "BLOCKED", "guard": "approval_permission_or_capability_block" },
+    { "from": "WAITING", "to": "FAILED", "guard": "dependency_failed_or_timeout_exhausted" },
+    { "from": "WAITING", "to": "CANCELLED", "guard": "cancel_requested" },
+    { "from": "BLOCKED", "to": "READY", "guard": "approval_granted_or_permission_capability_restored" },
+    { "from": "BLOCKED", "to": "FAILED", "guard": "block_unrecoverable" },
+    { "from": "BLOCKED", "to": "CANCELLED", "guard": "approval_rejected_or_cancel_requested" }
+  ],
+  "invariants": [
+    "no_transition_from_terminal",
+    "succeeded_requires_outputs_and_evidence",
+    "failed_requires_error",
+    "cancelled_requires_reason",
+    "context_status_must_follow_adr005_mapping"
+  ]
+}

@@ -1,0 +1,51 @@
+schema_version: 1
+id: testing
+version: "0.1.0"
+name: 测试任务
+description: 测试计划、执行和报告；修改测试代码时触发 G4，G5 记录测试证据。
+status: draft
+trigger:
+  task_types: [testing_task]
+  complexity: [L1, L2, L3]
+  risk_levels: [low, medium, high, critical]
+  environments: [dev, test, staging]
+  change_types: [code, analysis]
+policies:
+  max_concurrency: 5
+  failure_policy: fail_workflow
+  evidence_level: standard
+nodes:
+  - id: test_plan
+    type: skill
+    skill: testing
+    outputs:
+      - name: test-plan
+  - id: code_review
+    type: skill
+    skill: code-review
+    depends_on: [test_plan]
+    gate: G4
+    parallel_group: quality
+    outputs:
+      - name: review-report
+  - id: test_execution
+    type: skill
+    skill: testing
+    depends_on: [test_plan]
+    gate: G5
+    parallel_group: quality
+    outputs:
+      - name: test-report
+  - id: quality_gate
+    type: gate
+    gates: [G4, G5]
+    depends_on: [code_review, test_execution]
+  - id: report
+    type: skill
+    skill: documentation
+    depends_on: [quality_gate]
+    outputs:
+      - name: test-summary
+  - id: end
+    type: end
+    depends_on: [report]

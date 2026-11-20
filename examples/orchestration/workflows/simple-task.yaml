@@ -1,0 +1,45 @@
+schema_version: 1
+id: simple-task
+version: "0.1.0"
+name: 简单代码修改
+description: 适用于影响局限、需求明确的 L1 代码修改；G4 独立 Review 与 G5 测试不得跳过。
+status: draft
+trigger:
+  task_types: [simple_change]
+  complexity: [L1]
+  risk_levels: [low, medium]
+  environments: [dev, test, staging]
+  change_types: [code, config, docs]
+policies:
+  max_concurrency: 3
+  failure_policy: fail_workflow
+  evidence_level: standard
+nodes:
+  - id: coding
+    type: skill
+    skill: coding
+    outputs:
+      - name: implementation
+  - id: code_review
+    type: skill
+    skill: code-review
+    depends_on: [coding]
+    gate: G4
+    parallel_group: quality
+    outputs:
+      - name: review-report
+  - id: testing
+    type: skill
+    skill: testing
+    depends_on: [coding]
+    gate: G5
+    parallel_group: quality
+    outputs:
+      - name: test-report
+  - id: quality_gate
+    type: gate
+    gates: [G4, G5]
+    depends_on: [code_review, testing]
+  - id: end
+    type: end
+    depends_on: [quality_gate]

@@ -1,0 +1,53 @@
+schema_version: 1
+id: deployment
+version: "0.1.0"
+name: 生产部署
+description: 生产部署流程；必须 G6 + R3 + SA，部署后验证不等于 G6。
+status: tested
+trigger:
+  task_types: [deployment_task]
+  complexity: [L2, L3]
+  risk_levels: [high, critical]
+  environments: [prod]
+  change_types: [deployment, config]
+policies:
+  max_concurrency: 2
+  failure_policy: fail_workflow
+  evidence_level: strict
+nodes:
+  - id: preflight
+    type: check
+    description: 检查部署目标、变更摘要、回滚方案、备份和监控。
+  - id: quality_gate
+    type: gate
+    gates: [G4, G5]
+    description: 生产部署前必须具备同一版本的 G4 AND G5；N/A 必须有理由。
+    depends_on: [preflight]
+  - id: g6
+    type: gate
+    gate: G6
+    description: 仅实际生产部署动作之前触发；必须人工授权。
+    depends_on: [quality_gate]
+  - id: approval_sa
+    type: approval
+    approval:
+      type: sa
+      sa: true
+      reason: 生产部署需要显式安全授权
+      expires_in_seconds: 1800
+      approver_role: authorized-human
+    depends_on: [g6]
+  - id: deploy
+    type: skill
+    skill: deployment
+    depends_on: [approval_sa]
+    permissions: [R3]
+    outputs:
+      - name: deployment-record
+  - id: verification
+    type: check
+    description: 健康检查/冒烟/验收；属于 Deployment Verification，不是 G6。
+    depends_on: [deploy]
+  - id: end
+    type: end
+    depends_on: [verification]

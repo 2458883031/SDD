@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sdd.local/schemas/orchestration/evidence.schema.json",
+  "title": "SDDExecutionEvidence",
+  "description": "Orchestration 执行证据记录；不得包含原始凭证",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "evidence_id", "task_id", "workflow_id", "node_id", "type",
+    "actor", "input_refs", "output_refs", "result", "timestamp",
+    "redacted"
+  ],
+  "properties": {
+    "evidence_id": { "type": "string", "minLength": 1 },
+    "task_id": { "type": "string", "pattern": "^task-[0-9]{8}-[a-z0-9]{4,36}$" },
+    "workflow_id": { "type": "string", "pattern": "^[a-z][a-z0-9-]{1,63}$" },
+    "node_id": { "type": "string", "pattern": "^[a-z][a-z0-9_-]{1,63}$" },
+    "type": {
+      "type": "string",
+      "enum": ["input", "output", "tool", "gate", "approval", "test", "review", "command", "artifact", "failure", "recovery", "metric"]
+    },
+    "actor": { "$ref": "#/$defs/actor" },
+    "skill": {
+      "oneOf": [
+        { "type": "null" },
+        { "$ref": "#/$defs/skillRef" }
+      ]
+    },
+    "tool": { "type": ["string", "null"] },
+    "input_refs": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
+    "output_refs": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
+    "input_summary": { "type": ["string", "null"] },
+    "subject_hash": { "type": ["string", "null"] },
+    "result": { "type": "string", "enum": ["success", "failure", "blocked", "skipped"] },
+    "timestamp": { "type": "string", "format": "date-time" },
+    "redacted": { "const": true },
+    "details": { "type": "object" },
+    "parent_evidence_id": { "type": ["string", "null"] }
+  },
+  "$defs": {
+    "actor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "id"],
+      "properties": {
+        "type": { "type": "string", "enum": ["agent", "skill", "tool", "orchestrator", "human"] },
+        "id": { "type": "string", "minLength": 1 }
+      }
+    },
+    "skillRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "version"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "version": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(?:-[0-9A-Za-z.-]+)?(?:\\+[0-9A-Za-z.-]+)?$"
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,51 @@
+schema_version: 1
+id: bug-fix
+version: "0.1.0"
+name: Bug 修复
+description: 分析故障、修复代码，并通过独立 Review 与测试；部署不在本 Workflow 内自动触发。
+status: draft
+trigger:
+  task_types: [bug_fix]
+  complexity: [L2, L3]
+  risk_levels: [medium, high, critical]
+  environments: [dev, test, staging]
+  change_types: [code, config]
+policies:
+  max_concurrency: 5
+  failure_policy: fail_workflow
+  evidence_level: standard
+nodes:
+  - id: analysis
+    type: skill
+    skill: analysis
+    outputs:
+      - name: analysis
+  - id: coding
+    type: skill
+    skill: coding
+    depends_on: [analysis]
+    outputs:
+      - name: implementation
+  - id: code_review
+    type: skill
+    skill: code-review
+    depends_on: [coding]
+    gate: G4
+    parallel_group: quality
+    outputs:
+      - name: review-report
+  - id: testing
+    type: skill
+    skill: testing
+    depends_on: [coding]
+    gate: G5
+    parallel_group: quality
+    outputs:
+      - name: test-report
+  - id: quality_gate
+    type: gate
+    gates: [G4, G5]
+    depends_on: [code_review, testing]
+  - id: end
+    type: end
+    depends_on: [quality_gate]

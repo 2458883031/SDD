@@ -1,0 +1,60 @@
+{
+  "schema_version": 1,
+  "task_id": "task-20261120-e5f6a7b8",
+  "parent_task_id": "task-20261120-root0002",
+  "run_id": "run-20261120-0002",
+  "workflow_id": "bug-fix",
+  "workflow_version": "0.1.0",
+  "node_id": "testing",
+  "task_type": "bug_fix",
+  "status": "FAILED",
+  "context_status": "failed",
+  "context_scope": "node",
+  "complexity": "L2",
+  "risk_level": "medium",
+  "permission_level": "R2",
+  "inputs": [
+    {
+      "path": "artifacts/task-20261120-e5f6a7b8/implementation/change.patch",
+      "version": 1,
+      "sha256": "7777777777777777777777777777777777777777777777777777777777777777",
+      "type": "implementation"
+    }
+  ],
+  "outputs": [],
+  "dependencies": [],
+  "assigned_agent": { "id": "agent-main", "role": "executor" },
+  "assigned_skill": { "name": "testing", "version": "0.1.0" },
+  "retry_policy": {
+    "max_attempts": 1,
+    "backoff": "fixed",
+    "initial_delay_seconds": 0,
+    "max_delay_seconds": 0,
+    "jitter": false,
+    "retry_budget_seconds": 0,
+    "retry_on": [],
+    "non_retryable": ["input_invalid", "irreversible"]
+  },
+  "timeout_policy": {
+    "timeout_seconds": 600,
+    "on_timeout": "fail",
+    "heartbeat_seconds": 30
+  },
+  "approval_requirement": null,
+  "evidence_refs": ["ev-20261120-0011"],
+  "idempotency_key": "run-20261120-0002/testing/7777777777777777777777777777777777777777",
+  "subject_hash": "7777777777777777777777777777777777777777",
+  "attempt": 1,
+  "lease": null,
+  "error": {
+    "code": "test_environment_unavailable",
+    "message": "测试环境不可用，且该错误被标记为不可自动重试。",
+    "category": "non_retryable",
+    "retryable": false,
+    "details": {"environment": "test", "reason": "provisioning_failed"}
+  },
+  "created_at": "2026-11-20T12:00:00Z",
+  "started_at": "2026-11-20T12:01:00Z",
+  "completed_at": "2026-11-20T12:05:00Z",
+  "metadata": {}
+}

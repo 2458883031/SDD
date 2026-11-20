@@ -1,0 +1,24 @@
+{
+  "evidence_id": "ev-20261120-0011",
+  "task_id": "task-20261120-e5f6a7b8",
+  "workflow_id": "bug-fix",
+  "node_id": "testing",
+  "type": "failure",
+  "actor": { "type": "orchestrator", "id": "orchestrator-main" },
+  "skill": { "name": "testing", "version": "0.1.0" },
+  "tool": null,
+  "input_refs": ["artifacts/task-20261120-e5f6a7b8/implementation/change.patch@1"],
+  "output_refs": [],
+  "input_summary": "测试环境准备失败，未执行测试。",
+  "subject_hash": "7777777777777777777777777777777777777777",
+  "result": "failure",
+  "timestamp": "2026-11-20T12:05:00Z",
+  "redacted": true,
+  "details": {
+    "error_code": "test_environment_unavailable",
+    "category": "non_retryable",
+    "attempts": 1,
+    "recovery_action": "blocked_for_human"
+  },
+  "parent_evidence_id": null
+}

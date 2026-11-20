@@ -1,0 +1,32 @@
+{
+  "decision_id": "gd-20261120-g5-001",
+  "gate_id": "G5",
+  "task_id": "task-20261120-c3d4e5f6",
+  "workflow_id": "feature-development",
+  "node_id": "testing",
+  "required": true,
+  "status": "PASSED",
+  "subject_type": "commit",
+  "subject_hash": "2222222222222222222222222222222222222222",
+  "automated_checks": [
+    {
+      "name": "focused-tests",
+      "status": "passed",
+      "evidence_ref": "ev-20261120-0006",
+      "details": "变更相关测试全部通过。"
+    },
+    {
+      "name": "regression-suite",
+      "status": "passed",
+      "evidence_ref": "ev-20261120-0007",
+      "details": "回归套件通过。"
+    }
+  ],
+  "approval_ref": null,
+  "decision_reason": "测试通过，测试对象与当前 commit 一致。",
+  "decided_by": "system",
+  "decided_at": "2026-11-20T10:50:00Z",
+  "expires_at": null,
+  "evidence_refs": ["ev-20261120-0006", "ev-20261120-0007"],
+  "invalidation_reason": null
+}
