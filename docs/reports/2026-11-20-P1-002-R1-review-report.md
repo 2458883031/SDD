@@ -2,19 +2,19 @@
 
 | 项目 | 内容 |
 |------|------|
-| 任务编号 | P1-002-R1（含 R1-F2 补充整改） |
+| 任务编号 | P1-002-R1（含 R1-F2 / R1-F3 补充整改） |
 | 目标 PR | **#3** — https://github.com/2458883031/SDD/pull/3 |
 | 分支 | `feature/p1-002-orchestration` |
 | 基线 | `70b8549aff89fa8e1ce5caaf42bd413616d54c92`（main） |
 | R1 实施提交 | `14cd1e0af6775f5dac5df75af24b8b60fa1c5ab7` |
 | R1 报告文件所在提交 | `aa81252bfc1646adf938526e472d2281fc34047c` |
 | R1-F2 实施提交 | `9bc493362609f36bf2eae4db45c15f0f2ce1487d` |
-| R1-F2 报告提交 | 无法在文件内容中预写自身提交 SHA；由最终交付消息提供具体值 |
-| 最终 PR Head | 由最终交付消息提供（报告提交后更新） |
+| R1-F3 实施提交 | `49e845bdc30948395fe6c31b8ae2a0bf060951bc` |
+| R1-F3 报告提交 / 最终 PR Head | 由最终交付消息提供（无法预写自身提交 SHA） |
 | 执行/监督 | Claude Code |
-| 当前状态 | **P1-002-R1-F2 Draft（整改已推送，PR 未合并，待 ChatGPT 复审）** |
+| 当前状态 | **P1-002-R1-F3 Draft（整改已提交，PR 未合并，待 ChatGPT 复审）** |
 
-> 本轮在 R1 基础上补充修复 Approval 安全绑定、路径符号链接、DAG 分支终止性、并行汇合、Task Context Schema 约束和报告元数据。不重新设计 P1-002，不修改 main，不创建新 PR，不合并。
+> 本轮在 R1/F2 基础上补充修复 Approval 时间 Fail-Open、SA/both Scope 一致性、PR 描述统计。不重新设计 P1-002，不修改 main，不创建新 PR，不合并。
 
 ---
 
@@ -675,4 +675,141 @@ R1-F2 实施提交 `9bc4933`：10 files changed，+737/−132。
 
 ---
 
-**P1-002-R1-F2 状态：** 整改提交已推送，PR #3 未合并，等待 ChatGPT 独立复审。未启动 P1-003。
+## 十八、R1-F3 补充整改
+
+### 18.1 问题与整改映射
+
+| 编号 | 问题 | 整改 | 文件 |
+|------|------|------|------|
+| F3-M1 | `expires_at`/`now` 无法解析时跳过过期检查（Fail-Open） | `parse_timestamp` 严格要求字符串 + 时区 + 合法 ISO；`approval_usable` 要求 expires/now 均有效，否则拒绝；消费临界区执行完整校验 | `validate_orchestration.py`、`approval-orchestration-standard.md`、`approval.schema.json` |
+| F3-M2 | Schema/校验器要求所有 SA/both 非空 Scope，标准只写高风险 SA/G6 | 统一为所有 SA/both 和 G6 必须非空 Scope；纯操作按既有规则 | `approval-orchestration-standard.md`、`approval.schema.json`、`validate_orchestration.py` |
+| F3-M3 | PR #3 描述统计过期 | 更新 PR 描述为最终 workflows/tasks/gates/approvals/evidence、Markdown 文件数、提交/文件数、Head、测试和 Checks 状态 | GitHub PR #3 描述 |
+
+### 18.2 时间校验：Fail-Closed
+
+**解析实现：**
+
+- 仅接受非空字符串。
+- `Z` 转为 `+00:00` 后使用 `datetime.fromisoformat`。
+- 必须包含时区；缺失时区直接返回失败，不再假设 UTC。
+- 统一 `astimezone(timezone.utc)`；解析/转换异常返回失败。
+- `approval_usable()` 要求 `expires_at` 和 `now` 均解析成功；任一失败即拒绝。
+- 不使用系统时间兜底。
+- `ApprovalStore.consume()` 在锁内调用完整 `approval_usable()`，失败时保持 APPROVED，且不写 `consumed_at`/`consumed_by`。
+
+**非法输入实测（均通过真实 `ApprovalStore.consume()`）：**
+
+| 输入 | 结果 |
+|------|------|
+| `expires_at` 缺失 | 拒绝，状态保持 APPROVED，无消费字段 |
+| `expires_at=null` | 拒绝，状态保持 APPROVED |
+| `expires_at=""` | 拒绝，状态保持 APPROVED |
+| `expires_at` 非字符串 | 拒绝，状态保持 APPROVED |
+| `expires_at` 非法日期 | 拒绝，状态保持 APPROVED |
+| `expires_at` 无时区 | 拒绝，状态保持 APPROVED |
+| `expires_at` 非法时区 | 拒绝，状态保持 APPROVED |
+| `now` 缺失 | 拒绝，状态保持 APPROVED |
+| `now=null` | 拒绝，状态保持 APPROVED |
+| `now=""` | 拒绝，状态保持 APPROVED |
+| `now` 非字符串 | 拒绝，状态保持 APPROVED |
+| `now` 非法日期 | 拒绝，状态保持 APPROVED |
+| `now` 无时区 | 拒绝，状态保持 APPROVED |
+| `now` 非法时区 | 拒绝，状态保持 APPROVED |
+| `now == expires_at` | 拒绝，状态保持 APPROVED |
+| 修正为 `now < expires_at`（含 +08:00） | 成功消费一次 |
+
+`time_fail_closed_cases=15`；每个失败用例均检查：
+- 返回拒绝；
+- Approval 仍为 APPROVED；
+- `consumed_at` 不存在/为 null；
+- `consumed_by` 不存在/为 null。
+
+### 18.3 Scope 统一规则
+
+- 所有 `type=sa` 和 `type=both` 的 Approval 必须具有非空 Scope，不论风险等级。
+- `type=gate` + `gate=G6` 必须具有非空 Scope。
+- 纯操作 Approval（非 SA/both、非 G6）按既有规则：空 Scope 只匹配空请求，不是无限授权。
+- 继续使用 F2 的规范化完整 Scope 精确匹配；不放宽为子集/超集。
+- Schema、标准、校验器保持一致。
+
+测试：
+- SA 非空 Scope：允许（`approval-pure-sa.json`）。
+- SA 空 Scope：拒绝。
+- both 非空 Scope：允许（G6 Approval）。
+- both 空 Scope：拒绝。
+- G6 空 Scope：拒绝。
+- 纯操作空 Scope + 空请求：允许；非空请求：拒绝。
+
+### 18.4 F3 测试统计与输出
+
+```text
+ORCHESTRATION VALIDATION PASSED
+schemas=5 state_machines=5
+examples: workflows=10 tasks=5 gates=3 approvals=3 evidence=3
+schema_positive=24 schema_negative=32
+workflow_graph_positive=10 workflow_graph_negative=21
+state_transitions_positive=77 state_transitions_negative=245
+transition_definitions=77 transition_tests=322 guard_cases=18
+parallel_cases=19 task_context_cases=11 gate_cases=15
+approval_cases=111 scope_cases=15 expiry_cases=6 time_fail_closed_cases=15 path_cases=12
+dag_branch_cases=4 parallel_join_cases=6
+failure_cases=16 security_cases=134
+yaml_blocks_checked=9 registry_ids=7
+runtime_behavior=NOT_EXECUTED
+```
+
+P1-001 参考 Skill 校验器：
+
+```text
+REFERENCE SKILL VALIDATION PASSED
+structure=passed schema=Draft202012 examples_in=1 examples_out=5
+cases_input_validated=6 invalid_cases_rejected=3
+semver_valid=6 semver_invalid=6
+yaml_blocks_checked=9 metadata_examples=1 registry_ids=7
+negative_metadata_cases_passed=5
+optional_positive_cases_passed=2 optional_negative_cases_passed=9
+runtime_behavior=NOT_EXECUTED platform_entries=1
+```
+
+其他：
+
+- Markdown 链接：59 个文件 0 断链；
+- 全仓 JSON/YAML 解析：无错误；
+- 重复键 Loader：生效；
+- P0 ADR-001–008：未修改。
+
+### 18.5 F3 修改文件与统计
+
+F3 实施提交 `49e845b`：3 files changed，+130/−10。
+
+- `docs/standards/approval-orchestration-standard.md`
+- `schemas/orchestration/approval.schema.json`
+- `tests/unit/orchestration/validate_orchestration.py`
+
+F3 实施后累计：16 commits，49 files，+7811/−1。
+F3 报告提交后累计：17 commits，49 files（报告文件修改而非新增）。
+
+### 18.6 F3 GitHub 证据
+
+| 项目 | 值 |
+|------|-----|
+| F3 实施提交 | `49e845bdc30948395fe6c31b8ae2a0bf060951bc` |
+| F3 报告提交 / 最终 PR Head | 由最终交付消息提供（无法预写自身 SHA） |
+| PR | #3 — https://github.com/2458883031/SDD/pull/3 |
+| PR Base | `70b8549aff89fa8e1ce5caaf42bd413616d54c92` |
+| PR 状态 | open，未合并 |
+| PR 提交数 | 17 |
+| PR 变更文件数 | 49 |
+| CI / Checks | 无 CI 配置；Check Runs `total_count=0`；Combined Status `pending`，`total_count=0`；不代表 CI 通过 |
+
+### 18.7 Runtime 限制
+
+- `runtime_behavior = NOT_EXECUTED`。
+- Orchestrator、WorkflowRunner、Scheduler、StateStore、GateController、ApprovalCoordinator、EvidenceRecorder、Adapter 尚未实现。
+- 未验证生产级分布式原子消费。
+- 未验证 OS 级沙箱。
+- 六平台 SDD 语义兼容性未实测。
+
+---
+
+**P1-002-R1-F3 状态：** 整改提交已创建，待推送并等待 ChatGPT 独立复审。PR #3 保持 Open，未合并；未启动 P1-003。
