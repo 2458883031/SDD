@@ -80,7 +80,7 @@ Requirements 内容由 `skills/requirements-clarity/schemas/output.schema.json` 
 
 禁止字段：`implementation_plan`、`design_spec`、`design_approved`、`gate_approved`、`confirmation_ref`。
 
-所有包含 `data.analysis` 的状态都必须满足 `source_requirements_ref == input.requirements_ref`。`requirements_traceability` 必须为上游 FR/NFR/constraints/dependencies/assumptions/unknowns/open_questions/acceptance_criteria/non_goals/source_refs 建立保留/分析/映射/不适用关系；不适用或延后必须说明原因。
+所有包含 `data.analysis` 的状态都必须满足 `source_requirements_ref == input.requirements_ref`。`requirements_traceability` 必须为上游 FR/NFR/constraints/dependencies/assumptions/unknowns/open_questions/acceptance_criteria/non_goals/source_refs 建立保留/分析/映射/不适用关系；`analyzed`/`mapped` 必须有可解析 `analysis_refs`，`retained` 必须闭环到实际输出，`resolved` 必须有可追溯 `resolution_evidence_refs`，不适用/延后必须说明原因。
 
 ## 异常处理
 

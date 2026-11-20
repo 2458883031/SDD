@@ -116,6 +116,85 @@ def upstream_items(req):
     return items
 
 
+def analysis_ref_exists(ref, analysis, candidate_ids, risk_ids, design_considerations):
+    if ref.startswith("solution:"):
+        return ref.split(":", 1)[1] in candidate_ids
+    if ref.startswith("risk:"):
+        return ref.split(":", 1)[1] in risk_ids
+    if ref.startswith("design:"):
+        return ref.split(":", 1)[1] in design_considerations
+    if ref.startswith("technical:"):
+        field = ref.split(":", 1)[1]
+        return field in (analysis.get("technical_context") or {})
+    if ref.startswith("problem:"):
+        field = ref.split(":", 1)[1]
+        return field in (analysis.get("problem_statement") or {})
+    if ref.startswith("feasibility:"):
+        area = ref.split(":", 1)[1]
+        return area in {x.get("area") for x in analysis.get("feasibility_assessment", []) or []}
+    if ref.startswith("comparison:"):
+        dim_id = ref.split(":", 1)[1]
+        return dim_id in {d.get("id") for d in (analysis.get("comparison_matrix") or {}).get("dimensions", []) or []}
+    return ref in candidate_ids or ref in risk_ids or ref in design_considerations
+
+
+def resolved_evidence_exists(ref, analysis):
+    evidence = set()
+    for fact in analysis.get("facts", []) or []:
+        if fact.get("statement"):
+            evidence.add(fact["statement"])
+        evidence.update(fact.get("evidence_refs", []) or [])
+    for source_ref in analysis.get("source_refs", []) or []:
+        evidence.add(ref_key(source_ref))
+        if source_ref.get("path"):
+            evidence.add(source_ref["path"])
+    for candidate in analysis.get("candidate_solutions", []) or []:
+        evidence.update(candidate.get("evidence_refs", []) or [])
+    for risk in analysis.get("risk_assessment", []) or []:
+        evidence.update(risk.get("evidence_refs", []) or [])
+    return bool(ref) and ref in evidence
+
+
+def retained_actual(item, analysis, input_req):
+    source_type = item.get("source_type")
+    source_id = item.get("source_id")
+    problem = analysis.get("problem_statement") or {}
+    technical = analysis.get("technical_context") or {}
+    next_steps = analysis.get("next_steps") or {}
+    candidates = analysis.get("candidate_solutions", []) or []
+    if source_type == "unknown":
+        return source_id in {x.get("id") for x in analysis.get("unknowns", []) or []}
+    if source_type == "assumption":
+        return source_id in {x.get("id") for x in analysis.get("assumptions", []) or []}
+    if source_type == "non_goal":
+        return source_id in (problem.get("non_goals", []) or [])
+    if source_type == "open_question":
+        questions = []
+        questions.extend(next_steps.get("blocking_questions", []) or [])
+        questions.extend(next_steps.get("non_blocking_questions", []) or [])
+        upstream_question = None
+        if isinstance(input_req, dict):
+            for q in input_req.get("open_questions", []) or []:
+                if q.get("id") == source_id:
+                    upstream_question = q.get("question")
+                    break
+        return (upstream_question in questions if upstream_question else False) or source_id in questions
+    if source_type == "constraint":
+        return source_id in (problem.get("constraints", []) or []) or source_id in (technical.get("known_limitations", []) or [])
+    if source_type == "dependency":
+        if source_id in (technical.get("technical_dependencies", []) or []):
+            return True
+        return any(source_id in (c.get("dependencies", []) or []) for c in candidates)
+    if source_type == "acceptance_criterion":
+        return source_id in (next_steps.get("design_considerations", []) or [])
+    if source_type in {"functional_requirement", "non_functional_requirement"}:
+        return any(source_id in (c.get("applicable_requirements", []) or []) for c in candidates) or \
+            source_id in (next_steps.get("design_considerations", []) or [])
+    if source_type == "source_ref":
+        return source_id in {ref_key(x) for x in analysis.get("source_refs", []) or []}
+    return False
+
+
 def traceability_errors(analysis, input_obj):
     if not isinstance(analysis, dict):
         return []
@@ -128,24 +207,40 @@ def traceability_errors(analysis, input_obj):
     candidate_ids = {c.get("solution_id") for c in analysis.get("candidate_solutions", []) or []}
     risk_ids = {r.get("risk_id") for r in analysis.get("risk_assessment", []) or []}
     design_considerations = set((analysis.get("next_steps") or {}).get("design_considerations", []) or [])
+    input_req = input_obj.get("requirements") if isinstance(input_obj, dict) else None
+    required = upstream_items(input_req) if isinstance(input_req, dict) else set()
     for item in trace_items:
         key = (item.get("source_type"), item.get("source_id"))
         if key in seen:
             errs.append(f"duplicate trace item {key}")
         seen.add(key)
+        if required and key not in required:
+            errs.append(f"trace item {key} is not an upstream item")
         disposition = item.get("disposition")
-        if disposition in {"not_applicable", "deferred"} and not item.get("rationale"):
-            errs.append(f"trace item {key} requires rationale for {disposition}")
-        if disposition == "mapped":
-            refs = item.get("analysis_refs", []) or []
+        refs = item.get("analysis_refs", []) or []
+        if disposition in {"analyzed", "mapped"}:
             if not refs:
-                errs.append(f"mapped trace item {key} requires analysis_refs")
+                errs.append(f"{disposition} trace item {key} requires analysis_refs")
             for ref in refs:
-                if ref not in candidate_ids and ref not in risk_ids and ref not in design_considerations:
+                if not analysis_ref_exists(ref, analysis, candidate_ids, risk_ids, design_considerations):
                     errs.append(f"trace item {key} references unknown analysis object {ref}")
-    input_req = input_obj.get("requirements") if isinstance(input_obj, dict) else None
+        if disposition == "mapped":
+            # Mapped must point at a concrete analysis object, not a free string.
+            if not any(ref.startswith(("solution:", "risk:", "design:")) or ref in candidate_ids or ref in risk_ids or ref in design_considerations for ref in refs):
+                errs.append(f"mapped trace item {key} needs candidate/risk/design reference")
+        if disposition == "retained" and not retained_actual(item, analysis, input_req):
+            errs.append(f"retained trace item {key} has no actual retained content")
+        if disposition == "resolved":
+            evidence_refs = item.get("resolution_evidence_refs", []) or []
+            if not evidence_refs:
+                errs.append(f"resolved trace item {key} requires resolution_evidence_refs")
+            for ref in evidence_refs:
+                if not resolved_evidence_exists(ref, analysis):
+                    errs.append(f"resolved trace item {key} has unverifiable evidence {ref}")
+        if disposition in {"not_applicable", "deferred"}:
+            if not item.get("rationale"):
+                errs.append(f"trace item {key} requires rationale for {disposition}")
     if isinstance(input_req, dict):
-        required = upstream_items(input_req)
         missing = required - seen
         if missing:
             errs.append(f"upstream items not traced: {sorted(missing)}")
@@ -352,7 +447,12 @@ for path in output_files:
     obj = load_json(path)
     errs = schema_errors(out_validator, obj)
     check(not errs, f"{path.name}: schema invalid: {[e.message for e in errs[:3]]}")
-    sem = validate_analysis_output(obj, path.name)
+    out_ref = (obj.get("data", {}).get("analysis", {}) or {}).get("source_requirements_ref")
+    matching_input = next(
+        (x for x in input_objects.values() if ref_key(x.get("requirements_ref")) == ref_key(out_ref)),
+        None,
+    )
+    sem = validate_analysis_output(obj, path.name, matching_input)
     check(not sem, f"{path.name}: semantic error: {sem[:3]}")
     if not errs and not sem:
         output_positive += 1
@@ -433,6 +533,15 @@ expect_schema_invalid("analysis-missing-traceability", lambda a: a.pop("requirem
 expect_schema_invalid(
     "analysis-trace-not-applicable-no-rationale",
     lambda a: a["requirements_traceability"]["items"][0].update({"disposition": "not_applicable"}))
+expect_schema_invalid(
+    "analysis-trace-analyzed-no-refs",
+    lambda a: next(i for i in a["requirements_traceability"]["items"] if i.get("disposition") == "analyzed").update({"analysis_refs": []}))
+expect_schema_invalid(
+    "analysis-trace-resolved-no-evidence",
+    lambda a: a["requirements_traceability"]["items"][0].update({"disposition": "resolved", "resolution_evidence_refs": []}))
+expect_schema_invalid(
+    "analysis-trace-deferred-no-rationale",
+    lambda a: a["requirements_traceability"]["items"][0].update({"disposition": "deferred"}))
 
 input_bad_ref = copy.deepcopy(load_json(SKILL / "examples" / "example-input.json"))
 input_bad_ref["requirements_ref"]["type"] = "analysis"
@@ -505,6 +614,71 @@ trace_positive_errs = validate_analysis_output(trace_positive, "analysis-trace-p
 check(not trace_positive_errs, f"analysis-trace-positive-not-applicable: {trace_positive_errs[:3]}")
 if not trace_positive_errs:
     f1_positive_cases += 1
+
+# F2: disposition semantics must close the loop to actual analysis content.
+trace_negative_cases = 0
+trace_positive_cases = 0
+
+
+def expect_trace_failure(label, mutate):
+    global trace_negative_cases
+    expect_semantic_failure(label, mutate, full_input)
+    trace_negative_cases += 1
+
+
+expect_trace_failure("trace-retained-unknown-missing", lambda a: a.update({"unknowns": []}))
+expect_trace_failure("trace-retained-assumption-missing", lambda a: a.update({"assumptions": []}))
+expect_trace_failure(
+    "trace-retained-non-goal-missing",
+    lambda a: a["problem_statement"].update({"non_goals": []}))
+expect_trace_failure(
+    "trace-retained-open-question-missing",
+    lambda a: a["next_steps"].update({"blocking_questions": [], "non_blocking_questions": []}))
+
+
+def retained_dependency_without_content(a):
+    for item in a["requirements_traceability"]["items"]:
+        if item.get("source_type") == "dependency":
+            item["disposition"] = "retained"
+            item.pop("analysis_refs", None)
+    a["technical_context"]["technical_dependencies"] = []
+    for candidate in a["candidate_solutions"]:
+        candidate["dependencies"] = []
+
+
+expect_trace_failure("trace-retained-dependency-missing", retained_dependency_without_content)
+
+
+def mapped_acceptance_missing_ref(a):
+    for item in a["requirements_traceability"]["items"]:
+        if item.get("source_type") == "acceptance_criterion":
+            item["analysis_refs"] = ["SOL-MISSING"]
+
+
+expect_trace_failure("trace-mapped-acceptance-missing-ref", mapped_acceptance_missing_ref)
+
+resolved_positive = copy.deepcopy(base)
+for item in resolved_positive["data"]["analysis"]["requirements_traceability"]["items"]:
+    if item.get("source_type") == "non_goal":
+        item.update({
+            "disposition": "resolved",
+            "resolution_evidence_refs": ["docs/architecture/module-architecture.md"],
+        })
+        break
+resolved_errs = validate_analysis_output(resolved_positive, "trace-resolved-with-evidence", full_input)
+check(not resolved_errs, f"trace-resolved-with-evidence: {resolved_errs[:3]}")
+if not resolved_errs:
+    trace_positive_cases += 1
+
+deferred_positive = copy.deepcopy(base)
+for item in deferred_positive["data"]["analysis"]["requirements_traceability"]["items"]:
+    if item.get("source_type") == "non_goal":
+        item.update({"disposition": "deferred", "rationale": "该非目标在后续迭代处理"})
+        break
+deferred_errs = validate_analysis_output(deferred_positive, "trace-deferred-with-rationale", full_input)
+check(not deferred_errs, f"trace-deferred-with-rationale: {deferred_errs[:3]}")
+if not deferred_errs:
+    trace_positive_cases += 1
 
 # F2: source binding on all statuses, not only ok.
 partial_input = load_json(SKILL / "examples" / "example-input-partial.json")
@@ -583,4 +757,5 @@ print(f"schemas=2 input_examples={len(input_files)} output_examples={len(output_
 print(f"input_positive={input_positive} output_positive={output_positive} cases={len(case_list)} invalid_cases={len(invalid_list)}")
 print(f"schema_negative={schema_negative[0]} semantic_negative={semantic_negative[0]}")
 print(f"f1_negative={f1_negative_cases} f1_positive={f1_positive_cases} f2_cases={f2_cases} f3_cases={f3_cases}")
+print(f"trace_negative={trace_negative_cases} trace_positive={trace_positive_cases}")
 print("runtime_behavior=NOT_EXECUTED")

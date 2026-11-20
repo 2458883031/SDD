@@ -505,7 +505,7 @@
           {
             "source_type": "dependency",
             "source_id": "DEP-1",
-            "disposition": "analyzed",
+            "disposition": "mapped",
             "analysis_refs": [
               "SOL-A"
             ]

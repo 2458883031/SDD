@@ -324,9 +324,24 @@
           "enum": ["analyzed", "mapped", "retained", "resolved", "not_applicable", "deferred"]
         },
         "analysis_refs": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "resolution_evidence_refs": { "type": "array", "items": { "type": "string", "minLength": 1 } },
         "rationale": { "type": "string" }
       },
       "allOf": [
+        {
+          "if": { "properties": { "disposition": { "enum": ["analyzed", "mapped"] } }, "required": ["disposition"] },
+          "then": {
+            "properties": { "analysis_refs": { "minItems": 1 } },
+            "required": ["analysis_refs"]
+          }
+        },
+        {
+          "if": { "properties": { "disposition": { "const": "resolved" } }, "required": ["disposition"] },
+          "then": {
+            "properties": { "resolution_evidence_refs": { "minItems": 1 } },
+            "required": ["resolution_evidence_refs"]
+          }
+        },
         {
           "if": { "properties": { "disposition": { "enum": ["not_applicable", "deferred"] } }, "required": ["disposition"] },
           "then": {

@@ -167,19 +167,20 @@ Analysis 不得静默丢弃 Requirements 的关键信息。`requirements_traceab
 
 `disposition`：
 
-- `analyzed`：已纳入技术分析；
+- `analyzed`：已纳入技术分析；必须提供可解析的 `analysis_refs`（候选方案/风险/设计考虑/技术上下文/问题/可行性/比较维度），不能只加标签；
 - `mapped`：已映射到候选方案/风险/设计考虑，必须提供 `analysis_refs`；
-- `retained`：保留为假设/未知项/问题/非目标；
-- `resolved`：已解决并记录依据；
-- `not_applicable` / `deferred`：不适用/延后，必须提供 `rationale`。
+- `retained`：保留为假设/未知项/问题/非目标等，必须能在实际 Analysis 输出中找到对应内容；
+- `resolved`：已解决，必须提供 `resolution_evidence_refs`，且引用可追溯到事实证据/分析证据；
+- `not_applicable` / `deferred`：不适用/延后，必须提供非空 `rationale`。
 
 规则：
 
 1. 不要求机械复制上游内容；只要求逐项建立处理关系。
 2. 不适用/延后必须解释原因；不得静默删除。
 3. `mapped` 的 `analysis_refs` 必须指向存在的候选方案、风险或设计考虑。
-4. Requirements Artifact 不被修改；Analysis 不是第二个 Requirements 生产者。
-5. 只做最小追踪，不引入新的全局 Artifact 类型或状态机。
+4. `retained` 必须闭环到实际输出：Unknown→`analysis.unknowns`，Assumption→`analysis.assumptions`，Non-goal→`problem_statement.non_goals`，Open Question→`next_steps` 的对应问题，Constraint/Dependency 等→对应上下文/分析结果。
+5. Requirements Artifact 不被修改；Analysis 不是第二个 Requirements 生产者。
+6. 只做最小追踪，不引入新的全局 Artifact 类型或状态机。
 
 ---
 
