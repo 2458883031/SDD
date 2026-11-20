@@ -1,0 +1,47 @@
+# Dependencies
+node_modules/
+package-lock.json
+yarn.lock
+
+# Build output
+dist/
+build/
+out/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# OpenClaw specific
+.openclaw/
+agents/
+sessions/
+
+# Platform-specific
+platforms/*/node_modules/
+platforms/*/package-lock.json
+
+# Test artifacts
+coverage/
+.nyc_output/
