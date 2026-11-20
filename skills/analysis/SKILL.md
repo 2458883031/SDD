@@ -80,7 +80,7 @@ Requirements 内容由 `skills/requirements-clarity/schemas/output.schema.json` 
 
 禁止字段：`implementation_plan`、`design_spec`、`design_approved`、`gate_approved`、`confirmation_ref`。
 
-所有包含 `data.analysis` 的状态都必须满足 `source_requirements_ref == input.requirements_ref`。`requirements_traceability` 必须为上游 FR/NFR/constraints/dependencies/assumptions/unknowns/open_questions/acceptance_criteria/non_goals/source_refs 建立保留/分析/映射/不适用关系；`analyzed`/`mapped` 必须有可解析 `analysis_refs`，`retained` 必须闭环到实际输出（Acceptance Criterion 使用 `AC-<id>:` 设计考虑），`resolved` 只能引用 facts/source_refs/candidate/risk 的显式 evidence_refs，不得把 user_stated/assumption 的陈述当证据；不适用/延后必须说明原因。
+所有包含 `data.analysis` 的状态都必须满足 `source_requirements_ref == input.requirements_ref`。`requirements_traceability` 必须为上游 FR/NFR/constraints/dependencies/assumptions/unknowns/open_questions/acceptance_criteria/non_goals/source_refs 建立保留/分析/映射/不适用关系；`analyzed`/`mapped` 必须有可解析 `analysis_refs`，`retained` 必须闭环到实际输出（Acceptance Criterion 使用 `AC-<id>: <非空 consideration>`），`resolved` 只能引用 facts/candidate/risk 的显式 evidence_refs，不能使用 source_requirements_ref、普通 source_refs 或 user_stated/assumption 陈述作为证据；不适用/延后必须说明原因。
 
 ## 异常处理
 

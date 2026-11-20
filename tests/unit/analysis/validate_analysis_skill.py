@@ -138,15 +138,24 @@ def analysis_ref_exists(ref, analysis, candidate_ids, risk_ids, design_considera
     return ref in candidate_ids or ref in risk_ids or ref in design_considerations
 
 
+def is_requirements_ref(ref, analysis):
+    req = analysis.get("source_requirements_ref")
+    if not isinstance(req, dict) or not isinstance(ref, str):
+        return False
+    return ref in {
+        req.get("path"),
+        ref_key(req),
+        req.get("sha256"),
+    }
+
+
 def resolved_evidence_exists(ref, analysis):
+    if is_requirements_ref(ref, analysis):
+        return False
     evidence = set()
-    # Statements are not evidence. Only explicit, traceable references count.
+    # Statements and ordinary source registrations are not resolution evidence.
     for fact in analysis.get("facts", []) or []:
         evidence.update(fact.get("evidence_refs", []) or [])
-    for source_ref in analysis.get("source_refs", []) or []:
-        evidence.add(ref_key(source_ref))
-        if source_ref.get("path"):
-            evidence.add(source_ref["path"])
     for candidate in analysis.get("candidate_solutions", []) or []:
         evidence.update(candidate.get("evidence_refs", []) or [])
     for risk in analysis.get("risk_assessment", []) or []:
@@ -186,8 +195,11 @@ def retained_actual(item, analysis, input_req):
         return any(source_id in (c.get("dependencies", []) or []) for c in candidates)
     if source_type == "acceptance_criterion":
         considerations = next_steps.get("design_considerations", []) or []
+        prefix = source_id + ":"
         return any(
-            isinstance(value, str) and (value == source_id or value.startswith(source_id + ":"))
+            isinstance(value, str)
+            and value.startswith(prefix)
+            and bool(value[len(prefix):].strip())
             for value in considerations
         )
     if source_type in {"functional_requirement", "non_functional_requirement"}:
@@ -726,12 +738,34 @@ if only_statement_errs:
     resolved_negative_cases += 1
 
 expect_resolved_pass("resolved-fact-evidence", "docs/architecture/module-architecture.md")
-expect_resolved_pass(
-    "resolved-source-ref",
-    ref_key(base["data"]["analysis"]["source_requirements_ref"]),
-)
-expect_resolved_pass("resolved-risk-evidence", "requirements:NFR-1")
 expect_resolved_pass("resolved-candidate-evidence", "docs/architecture/system-architecture.md")
+expect_resolved_pass("resolved-risk-evidence", "docs/architecture/security-architecture.md")
+
+# Requirements/source registrations cannot prove resolution.
+req_ref = base["data"]["analysis"]["source_requirements_ref"]
+expect_resolved_failure("resolved-requirements-path", req_ref["path"])
+expect_resolved_failure("resolved-requirements-ref-key", ref_key(req_ref))
+expect_resolved_failure("resolved-requirements-hash", req_ref["sha256"])
+
+ordinary_ref = {
+    "path": "docs/notes/background.md",
+    "version": 1,
+    "sha256": "9" * 64,
+    "type": "report",
+}
+background = resolved_output("docs/notes/background.md")
+background["data"]["analysis"]["source_refs"].append(ordinary_ref)
+background_errs = validate_analysis_output(background, "resolved-ordinary-source-ref", full_input)
+check(bool(background_errs), "resolved-ordinary-source-ref: expected rejection")
+if background_errs:
+    resolved_negative_cases += 1
+
+source_only = resolved_output(ref_key(ordinary_ref))
+source_only["data"]["analysis"]["source_refs"].append(ordinary_ref)
+source_only_errs = validate_analysis_output(source_only, "resolved-source-registration-only", full_input)
+check(bool(source_only_errs), "resolved-source-registration-only: expected rejection")
+if source_only_errs:
+    resolved_negative_cases += 1
 
 # F3-B: Acceptance Criterion retained must map to a concrete design consideration.
 acceptance_negative_cases = 0
@@ -756,6 +790,10 @@ if not acceptance_errs:
     acceptance_positive_cases += 1
 
 for label, considerations in (
+    ("acceptance-retained-exact-id-only", ["AC-1"]),
+    ("acceptance-retained-empty-consideration", ["AC-1:"]),
+    ("acceptance-retained-whitespace-consideration", ["AC-1:   "]),
+    ("acceptance-retained-other-ac", ["AC-2: 无关考虑"]),
     ("acceptance-retained-missing-consideration", []),
     ("acceptance-retained-unrelated-consideration", ["其他设计考虑"]),
 ):

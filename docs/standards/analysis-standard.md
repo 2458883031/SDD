@@ -169,8 +169,8 @@ Analysis 不得静默丢弃 Requirements 的关键信息。`requirements_traceab
 
 - `analyzed`：已纳入技术分析；必须提供可解析的 `analysis_refs`（候选方案/风险/设计考虑/技术上下文/问题/可行性/比较维度），不能只加标签；
 - `mapped`：已映射到候选方案/风险/设计考虑，必须提供 `analysis_refs`；
-- `retained`：保留为假设/未知项/问题/非目标等，必须能在实际 Analysis 输出中找到对应内容；Acceptance Criterion retained 时必须在 `next_steps.design_considerations` 中提供 `AC-<id>: <consideration>` 或精确 `AC-<id>` 对应项；
-- `resolved`：已解决，必须提供 `resolution_evidence_refs`，且引用只能来自事实 `evidence_refs`、`analysis.source_refs`、候选方案 `evidence_refs` 或风险 `evidence_refs`；不得用 `user_stated`/`assumption` 的 statement 充当证据；
+- `retained`：保留为假设/未知项/问题/非目标等，必须能在实际 Analysis 输出中找到对应内容；Acceptance Criterion retained 时必须在 `next_steps.design_considerations` 中提供 `AC-<id>: <非空 consideration>`，单独的 `AC-<id>`、空考虑或其他 AC 的考虑均不合格；
+- `resolved`：已解决，必须提供 `resolution_evidence_refs`，且引用只能来自事实 `evidence_refs`、候选方案 `evidence_refs` 或风险 `evidence_refs`；`source_requirements_ref`、普通 `source_refs` 登记、`user_stated`/`assumption` statement 均不得充当解决证据；
 - `not_applicable` / `deferred`：不适用/延后，必须提供非空 `rationale`。
 
 规则：
@@ -178,8 +178,8 @@ Analysis 不得静默丢弃 Requirements 的关键信息。`requirements_traceab
 1. 不要求机械复制上游内容；只要求逐项建立处理关系。
 2. 不适用/延后必须解释原因；不得静默删除。
 3. `mapped` 的 `analysis_refs` 必须指向存在的候选方案、风险或设计考虑。
-4. `retained` 必须闭环到实际输出：Unknown→`analysis.unknowns`，Assumption→`analysis.assumptions`，Non-goal→`problem_statement.non_goals`，Open Question→`next_steps` 的对应问题，Acceptance Criterion→`next_steps.design_considerations` 的 `AC-<id>:` 对应项，Constraint/Dependency 等→对应上下文/分析结果。
-5. `resolved` 的证据只接受显式 evidence_refs/source_refs/candidate/risk 引用；`user_stated` 或 `assumption` 的普通陈述不得作为解决证据。
+4. `retained` 必须闭环到实际输出：Unknown→`analysis.unknowns`，Assumption→`analysis.assumptions`，Non-goal→`problem_statement.non_goals`，Open Question→`next_steps` 的对应问题，Acceptance Criterion→`next_steps.design_considerations` 的 `AC-<id>: <非空 consideration>`，Constraint/Dependency 等→对应上下文/分析结果。
+5. `resolved` 的证据只接受事实/候选/风险中的显式 evidence_refs；`source_requirements_ref`、普通 source_refs 登记、`user_stated` 或 `assumption` 的普通陈述不得作为解决证据。
 6. Requirements Artifact 不被修改；Analysis 不是第二个 Requirements 生产者。
 7. 只做最小追踪，不引入新的全局 Artifact 类型或状态机。
 
