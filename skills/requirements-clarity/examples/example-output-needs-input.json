@@ -1,0 +1,18 @@
+{
+  "status": "needs_input",
+  "data": {
+    "questions": [
+      "“优化系统”具体指性能、稳定性、交互还是可维护性？",
+      "期望的验收指标是什么？"
+    ],
+    "requirements": {
+      "goal": "优化系统",
+      "scope": [],
+      "constraints": [],
+      "non_goals": []
+    }
+  },
+  "artifacts": [],
+  "errors": [],
+  "evidence": []
+}

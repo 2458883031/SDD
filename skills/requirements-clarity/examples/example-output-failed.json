@@ -1,0 +1,13 @@
+{
+  "status": "failed",
+  "artifacts": [],
+  "errors": [
+    {
+      "code": "tool_error",
+      "message": "读取项目上下文失败",
+      "retryable": true,
+      "details": {}
+    }
+  ],
+  "evidence": []
+}

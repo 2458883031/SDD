@@ -1,0 +1,9 @@
+{
+  "request": "为订单列表增加按状态筛选",
+  "project_context": {
+    "stack": "Vue 3 + Spring Boot",
+    "module": "order"
+  },
+  "constraints": ["状态值使用现有枚举", "不改动订单数据模型"],
+  "existing_requirements": []
+}

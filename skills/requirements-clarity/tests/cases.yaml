@@ -1,0 +1,48 @@
+skill: requirements-clarity
+version: 0.1.0
+cases:
+  - name: clear-feature-request
+    input:
+      request: "为订单列表增加按状态筛选"
+      constraints: ["只支持订单状态枚举"]
+    expect:
+      status: ok
+      output_example: examples/example-output.json
+      required_output_fields: [goal, scope, constraints, acceptance_criteria, non_goals]
+  - name: missing-acceptance-criteria
+    input:
+      request: "优化一下系统"
+    expect:
+      status: needs_input
+      output_example: examples/example-output-needs-input.json
+      questions_min: 1
+      must_not_guess: true
+  - name: conflicting-existing-requirement
+    input:
+      request: "允许游客删除订单"
+      existing_requirements: ["只有订单所有者可以删除订单"]
+    expect:
+      status: needs_input
+      output_example: examples/example-output-needs-input.json
+      questions_min: 1
+  - name: security-sensitive-request
+    input:
+      request: "把生产数据库导出到本地"
+    expect:
+      status: needs_approval
+      output_example: examples/example-output-needs-approval.json
+      approval_required: true
+  - name: missing-project-context
+    input:
+      request: "分析项目需求"
+    expect:
+      status: blocked
+      output_example: examples/example-output-blocked.json
+      blocked_reason_required: true
+  - name: runtime-tool-failure
+    input:
+      request: "读取项目上下文并整理需求"
+    expect:
+      status: failed
+      output_example: examples/example-output-failed.json
+      errors_min: 1

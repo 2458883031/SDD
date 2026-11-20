@@ -1,0 +1,34 @@
+schema_version: 1
+platform: openclaw
+adapter_version: "0.1"
+skills:
+  requirements-clarity:
+    discovery:
+      roots:
+        - workspace/skills
+        - workspace/.agents/skills
+    trigger:
+      mode: description_match
+      aliases: []
+      auto_invoke: true
+    requirements:
+      bins: []
+      env: []
+      config: []
+    invocation:
+      mode: native
+      tools: [read]   # file-read -> ToolPort; write is ContextPort-internal for artifact-port
+    capabilities:
+      skill-discovery: true
+      skill-metadata: true
+      tool-invocation: true
+      context-port: true
+      artifact-port: true
+      result-port: true
+      approval-port: false
+    approval:
+      mode: platform
+    context:
+      base_dir_token: "{baseDir}"
+    limitations:
+      - "P1-001 reference only; SDD Skill semantics not yet verified in OpenClaw."

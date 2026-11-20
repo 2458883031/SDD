@@ -1,0 +1,22 @@
+schema_version: 1
+name: requirements-clarity
+version: 0.1.0
+status: draft
+license: MIT
+maintainers:
+  - role: owner
+    id: sdd-p1-reference
+dependencies:
+  skills: []
+  tools: [file-read]   # Skill-facing Tool; artifact writes use artifact-port/ContextPort
+compatibility:
+  requires_capabilities:
+    - skill-discovery
+    - skill-metadata
+    - tool-invocation
+    - context-port
+    - artifact-port
+    - result-port
+  optional_capabilities:
+    - approval-port
+changelog: CHANGELOG.md

@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sdd.local/skills/requirements-clarity/input.schema.json",
+  "title": "RequirementsClarityInput",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["request"],
+  "properties": {
+    "request": {
+      "type": "string",
+      "minLength": 1,
+      "description": "用户原始需求描述"
+    },
+    "project_context": {
+      "type": "object",
+      "description": "项目上下文摘要；不得包含凭证",
+      "additionalProperties": true
+    },
+    "constraints": {
+      "type": "array",
+      "description": "已知业务、技术、时间或安全约束",
+      "items": { "type": "string", "minLength": 1 },
+      "default": []
+    },
+    "existing_requirements": {
+      "type": "array",
+      "description": "已有需求或 Artifact 引用",
+      "items": { "type": "string", "minLength": 1 },
+      "default": []
+    }
+  }
+}

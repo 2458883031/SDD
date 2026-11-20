@@ -1,0 +1,15 @@
+{
+  "status": "blocked",
+  "data": {
+    "requirements": {
+      "goal": "分析项目需求",
+      "scope": [],
+      "constraints": [],
+      "non_goals": []
+    },
+    "blocked_reason": "缺少项目上下文，无法读取允许的项目文件"
+  },
+  "artifacts": [],
+  "errors": [],
+  "evidence": []
+}

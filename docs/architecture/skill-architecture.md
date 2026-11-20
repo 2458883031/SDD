@@ -1,5 +1,7 @@
 # Skill 架构设计
 
+> **P1-001-R1 文档状态：** §1–§10 是 P0 历史设计基线，保留用于追溯；其中示例/兼容性表不再作为当前有效规范。当前有效规则见 §11 与 `docs/standards/`；平台证据见 [platform-compatibility-matrix.md](./platform-compatibility-matrix.md)。
+
 ## 1. 概述
 
 本文件定义 SDD 体系中 Skill 的标准结构、加载机制和编写原则。Skill 的职责边界见 [system-architecture.md §2](./system-architecture.md#2-核心概念权威定义)。
@@ -130,7 +132,9 @@ platforms/
 
 > 以上为 P0 设计规划，本阶段不创建实际文件。六个平台清单与目录必须保持一致：Codex、Claude Code、Cursor、Gemini CLI、OpenCode、OpenClaw。
 
-### 3.2 平台元数据示例（设计示例，未创建）
+### 3.2 平台元数据示例（P0 历史示例，已由 P1 标准取代）
+
+> 以下示例仅保留 P0 设计历史，不是当前字段定义。当前字段、未知字段处理、缺失能力/降级规则见 [skill-metadata-standard.md](../standards/skill-metadata-standard.md) 与 [Capability Registry](./platform-adapter-architecture.md#21-capability-registry统一能力标识)。
 
 ```yaml
 # platforms/openclaw/skill-metadata.yaml
@@ -155,6 +159,8 @@ invocation:
 ```
 
 ### 3.3 平台字段处理规则
+
+> 以下是 P0 的通用原则；当前字段归属、未知字段、缺失能力和降级处理以 P1 metadata standard 与 Capability Registry 为准。
 
 1. **平台不支持某字段** — 适配层忽略并记录警告；核心 Skill 仍按通用字段工作。
 2. **平台扩展字段** — 只能影响发现、调用、环境准备和审批映射，不得改变核心语义。
@@ -200,13 +206,15 @@ invocation:
 
 ```text
 deployment/
-├── SKILL.md              # 工作流 + 选择逻辑
+├── SKILL.md              # 能力入口 + 选择逻辑
 └── references/
     ├── docker.md         # Docker 部署
     ├── kubernetes.md     # K8s 部署
     ├── aws.md            # AWS 部署
     └── gcp.md            # GCP 部署
 ```
+
+> **历史说明：** 原示例中的 `SKILL.md # 工作流 + 选择逻辑` 已修正为“能力入口 + 选择逻辑”。Skill 不实现 Workflow；Workflow 由编排层定义并通过节点引用 Skill。
 
 调用规则：Agent 根据任务上下文决定读取哪个 reference 文件。例如检测到 Dockerfile → 读取 `docker.md`。
 
@@ -260,6 +268,8 @@ If input is invalid, early rejection saves time and avoids confusing errors late
 
 ### 8.2 兼容性状态
 
+> **历史摘要：** 以下 P0 状态表不再作为当前证据。当前六平台证据等级与来源见 [platform-compatibility-matrix.md](./platform-compatibility-matrix.md)。
+
 平台能力状态统一在 [platform-architecture.md](./platform-architecture.md) 维护。未实测能力必须标记为「设计假设」或「待验证」，不得写「完全兼容」。
 
 ## 9. 测试与验证
@@ -302,5 +312,47 @@ steps:
 - [x] 通用 Skill 规范与平台元数据分离（P0-002）
 - [x] 结构规范定义
 - [x] CLI 示例状态标注
-- [ ] 模板文件创建（P1）
+- [x] P1-001 规范落地（见第 11 节）
+- [ ] 模板文件与批量 Skill（P1 后续）
 - [ ] 平台适配验证（P7）
+
+## 11. P1-001 规范落地
+
+P1-001 在保留 P0 架构关系的前提下，把 Skill 规范拆成可执行的标准文件：
+
+| 主题 | 权威文档 |
+|------|----------|
+| Skill 定义、边界、目录、SKILL.md 正文 | [skill-standard.md](../standards/skill-standard.md) |
+| 核心/通用/平台元数据分层 | [skill-metadata-standard.md](../standards/skill-metadata-standard.md) |
+| 输入输出与 JSON Schema | [skill-io-contract.md](../standards/skill-io-contract.md) |
+| 权限、Tool、SA/G6 | [skill-security-standard.md](../standards/skill-security-standard.md) |
+| 版本、依赖、生命周期 | [skill-versioning-standard.md](../standards/skill-versioning-standard.md) |
+| 平台适配接口 | [platform-adapter-architecture.md](./platform-adapter-architecture.md) |
+| 六平台证据矩阵 | [platform-compatibility-matrix.md](./platform-compatibility-matrix.md) |
+
+### 11.1 关键补充
+
+1. **核心 Frontmatter 仍只含 name/description/requires**；版本进入 `skill.yaml`，平台字段进入 `platforms/<platform>/skill-metadata.yaml`。
+2. **Skill 不承担 Workflow 调度**：超时、重试、门禁暂停和状态机由 Orchestration 负责；Skill 返回 `ok/needs_input/needs_approval/blocked/failed`。
+3. **输入输出必须可验证**：结构化 IO 使用 JSON Schema Draft 2020-12；Artifact 引用遵循 ADR-005。
+4. **安全只声明不授权**：`requires.permissions` 是需求；R0–R4/SA/G6 的实际执行由安全控制层负责。
+5. **测试分级**：Skill 级测试（元数据/Schema/触发/IO/异常/安全）不等同于 Workflow 的 G4/G5。
+6. **版本与依赖**：SemVer 2.0.0；依赖 Skill/Tool/通用能力，依赖平台名不得进入核心。
+7. **参考 Skill**：`skills/requirements-clarity/` 作为 P1-001 最小可执行样例，用于验证标准。
+
+### 11.2 与 P0 的关系
+
+- 不改变 P0 的六概念、L6 适配边界、R0–R4、G1–G6 或 Task Context 决策。
+- P0 `skill-architecture.md` 继续定义 Skill 的架构关系；P1 standards 提供字段/契约/测试细节。
+- 平台能力状态以 [platform-compatibility-matrix.md](./platform-compatibility-matrix.md) 的证据等级为准；未实测能力不得写成 Verified。
+
+### 11.3 历史口径
+
+- §1–§10 的 P0 示例、兼容性摘要和平台字段示例是历史基线，不是当前可复制标准。
+- 任何与 P1 `docs/standards/` 冲突的旧示例，以 P1 标准为准，并在后续任务中清理。
+- `platforms/<platform>/skill-metadata.yaml` 的当前字段结构以 [skill-metadata-standard.md](../standards/skill-metadata-standard.md) 为准；`artifact-port` 由 ContextPort 提供。
+- Capability IDs 以 [Capability Registry](./platform-adapter-architecture.md#21-capability-registry统一能力标识) 为准。
+
+---
+
+**P1-001 状态：** 设计产出，待 ChatGPT 评审。未实现运行时校验器、编排引擎或平台适配器。

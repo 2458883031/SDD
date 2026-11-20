@@ -1,0 +1,20 @@
+{
+  "status": "needs_approval",
+  "data": {
+    "requirements": {
+      "goal": "导出生产数据库到本地",
+      "scope": ["生产数据导出"],
+      "constraints": ["需要生产环境授权"],
+      "non_goals": []
+    },
+    "approval_request": {
+      "gate_or_sa": "SA + G6（如涉及生产部署）",
+      "reason": "涉及生产数据读取与敏感凭证",
+      "impact": "可能触及生产数据；需要 R4 权限与审计",
+      "rollback": "不执行导出；如需执行，先备份并限制导出范围"
+    }
+  },
+  "artifacts": [],
+  "errors": [],
+  "evidence": []
+}
