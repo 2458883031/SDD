@@ -408,11 +408,13 @@ node_states:
 |----------|--------|---------------|----------|
 | simple_change | L1 | simple-task | G4（简化，独立 Review 不跳过）、G5（简化）；安全约束不跳过 |
 | bug_fix | L2 | bug-fix | G4、G5 |
-| feature_dev | L2/L3 | feature-development | G1、G2、G3、G4、G5（部署时 G6） |
-| refactoring | L3 | refactoring | G1、G2、G3、G4、G5（部署时 G6） |
-| new_project | L3 | new-project | G1、G2、G3、G4、G5、G6 |
-| deployment_task | L2 | deployment | G6；如涉及代码变更还需 G4/G5 |
+| feature_dev | L2/L3 | feature-development | G1、G2、G3、G4、G5（生产部署时 G6） |
+| refactoring | L3 | refactoring | G1、G2、G3、G4、G5（生产部署时 G6） |
+| new_project | L3 | new-project | G1、G2、G3、G4、G5；G6 仅计划生产部署 |
+| deployment_task | L2 | deployment | 涉及代码/配置时 G4、G5；生产部署时 G6；非生产部署不触发 G6 |
 | technical_consultation | L1/L2 | consultation | 无需代码门禁；输出设计/分析产物 |
+
+> 门禁规则以 [ADR-006](../decisions/ADR-006-quality-gates.md) 为准；本表只表示任务类型到 Workflow 的映射，不重新定义门禁规则。
 
 ## 6. Task Context 与产物
 

@@ -81,11 +81,13 @@
 |----------|--------|-----------|----------|
 | simple_change | L1 | simple-task | G4（简化，独立 Review 不跳过）、G5（简化）；安全约束不跳过 |
 | bug_fix | L2 | bug-fix | G4、G5 |
-| feature_dev | L2/L3 | feature-development | G1、G2、G3、G4、G5（部署时 G6） |
-| refactoring | L3 | refactoring | G1、G2、G3、G4、G5（部署时 G6） |
-| new_project | L3 | new-project | G1、G2、G3、G4、G5、G6 |
-| deployment | L2 | deployment | G6；涉及代码/配置变更时还需 G4/G5 |
+| feature_dev | L2/L3 | feature-development | G1、G2、G3、G4、G5（生产部署时 G6） |
+| refactoring | L3 | refactoring | G1、G2、G3、G4、G5（生产部署时 G6） |
+| new_project | L3 | new-project | G1、G2、G3、G4、G5；G6 仅计划生产部署 |
+| deployment | L2 | deployment | 涉及代码/配置时 G4、G5；生产部署时 G6；非生产部署不触发 G6 |
 | consultation | L1/L2 | consultation | 无代码门禁；输出分析/设计产物 |
+
+> 门禁规则以 [ADR-006](./ADR-006-quality-gates.md) 为准；本表只表示任务类型到 Workflow 的映射，不重新定义门禁规则。
 
 ### Workflow DAG 依赖
 
@@ -118,3 +120,4 @@ Workflow 节点字段、失败路径、重试、超时和审批暂停/恢复语�
 
 - **2026-11-20（P0-002）**：明确编排引擎与 orchestration Skill 的边界；将 Review/Testing 定义为并行且共同满足质量门禁；Deployment 必须依赖 G4/G5；门禁规则统一引用 ADR-006；Workflow DAG 语义独立定义。
 - **2026-11-20（P0-003）**：简单修改 Workflow 增加独立 Code Review；G4 与 G5 并行且共同构成质量门禁；G6 在生产部署动作之前检查。
+- **2026-11-20（P0-Final）**：任务表 G6 范围与 ADR-006 对齐；新项目仅计划生产部署时触发 G6，非生产部署不触发 G6；补注门禁规则以 ADR-006 为准。
