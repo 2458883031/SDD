@@ -17,6 +17,7 @@ import json
 import posixpath
 import re
 import threading
+from datetime import datetime, timezone
 from pathlib import Path
 
 import yaml
@@ -227,6 +228,33 @@ task_bad_scope = copy.deepcopy(base_task)
 task_bad_scope["context_scope"] = "invalid"
 expect_schema_invalid(task_schema, task_bad_scope, "task-invalid-context-scope", negative)
 
+node_missing_parent = copy.deepcopy(base_task)
+node_missing_parent.pop("parent_task_id", None)
+expect_schema_invalid(task_schema, node_missing_parent, "task-node-missing-parent", negative)
+
+node_bad_parent = copy.deepcopy(base_task)
+node_bad_parent["parent_task_id"] = "not-a-root-task"
+expect_schema_invalid(task_schema, node_bad_parent, "task-node-invalid-parent", negative)
+
+node_verifying = copy.deepcopy(base_task)
+node_verifying["context_status"] = "verifying"
+expect_schema_invalid(task_schema, node_verifying, "task-node-verifying-status", negative)
+
+root_task_base = next((load_json(p) for p in task_files if load_json(p).get("context_scope") == "root"), None)
+if root_task_base:
+    root_with_parent = copy.deepcopy(root_task_base)
+    root_with_parent["parent_task_id"] = "task-20261120-root0001"
+    expect_schema_invalid(task_schema, root_with_parent, "task-root-with-parent", negative)
+
+root_completed = next((load_json(p) for p in task_files
+                       if load_json(p).get("context_scope") == "root"
+                       and load_json(p).get("context_status") == "completed"), None)
+if root_completed:
+    root_completed_unverified = copy.deepcopy(root_completed)
+    root_completed_unverified["workflow_verified"] = False
+    expect_schema_invalid(task_schema, root_completed_unverified,
+                          "task-root-completed-without-verification", negative)
+
 succeeded_task = next((load_json(p) for p in task_files if load_json(p).get("status") == "SUCCEEDED"), None)
 if succeeded_task:
     no_outputs = copy.deepcopy(succeeded_task)
@@ -283,6 +311,14 @@ approval_consumed_no_fields.pop("consumed_at", None)
 approval_consumed_no_fields.pop("consumed_by", None)
 expect_schema_invalid(approval_schema, approval_consumed_no_fields,
                       "approval-consumed-no-consumption-fields", negative)
+
+approval_highrisk_empty_scope = copy.deepcopy(base_approval)
+approval_highrisk_empty_scope["type"] = "sa"
+approval_highrisk_empty_scope["gate"] = None
+approval_highrisk_empty_scope["risk_level"] = "high"
+approval_highrisk_empty_scope["scope"] = {}
+expect_schema_invalid(approval_schema, approval_highrisk_empty_scope,
+                      "approval-highrisk-empty-scope", negative)
 
 evidence_not_redacted = copy.deepcopy(base_evidence)
 evidence_not_redacted["redacted"] = False
@@ -384,47 +420,67 @@ def workflow_graph_errors(wf, catalog=None, stack=(), depth=0):
         errs.append("no entry node")
     if not ends:
         errs.append("no end node")
-    # Forward edges: dependency edges plus on_success/on_failure.
-    forward = {nid: set() for nid in idset}
+    # Separate success and failure edges. A failure-only node does not need a
+    # success path, but every declared failure branch must still terminate.
+    success_forward = {nid: set() for nid in idset}
+    failure_forward = {nid: set() for nid in idset}
     for nid, deps in graph.items():
         for dep in deps:
-            if dep in forward:
-                forward[dep].add(nid)
+            if dep in success_forward:
+                success_forward[dep].add(nid)
+                failure_forward[dep].add(nid)
+    by_id = {n.get("id"): n for n in nodes}
     for node in nodes:
         nid = node.get("id")
-        for edge in ("on_success", "on_failure"):
-            target = node.get(edge)
-            if target in idset:
-                forward[nid].add(target)
-    # Reachability from entries.
-    seen = set(entries)
-    stack_ids = list(entries)
-    while stack_ids:
-        cur = stack_ids.pop()
-        for nxt in forward.get(cur, []):
-            if nxt not in seen:
-                seen.add(nxt)
-                stack_ids.append(nxt)
+        if node.get("on_success") in idset:
+            success_forward[nid].add(node["on_success"])
+            failure_forward[nid].add(node["on_success"])
+        if node.get("on_failure") in idset:
+            failure_forward[nid].add(node["on_failure"])
+
+    def reachable_from(start, edges):
+        seen_local = {start}
+        todo = [start]
+        while todo:
+            cur = todo.pop()
+            for nxt in edges.get(cur, []):
+                if nxt not in seen_local:
+                    seen_local.add(nxt)
+                    todo.append(nxt)
+        return seen_local
+
+    # All nodes must be reachable from an entry through any declared edge.
+    seen = set()
+    for entry in entries:
+        seen |= reachable_from(entry, failure_forward)
     unreachable = idset - seen
     if unreachable:
         errs.append(f"unreachable nodes: {sorted(unreachable)}")
-    # Every node must have a path to an end.
-    for nid in idset:
-        reachable = {nid}
-        todo = [nid]
-        while todo:
-            cur = todo.pop()
-            for nxt in forward.get(cur, []):
-                if nxt not in reachable:
-                    reachable.add(nxt)
-                    todo.append(nxt)
-        if not (reachable & set(ends)):
-            errs.append(f"{nid}: cannot reach an end node")
+
+    # Every success-reachable node must terminate through success edges.
+    success_seen = set()
+    for entry in entries:
+        success_seen |= reachable_from(entry, success_forward)
+    for nid in success_seen:
+        if not (reachable_from(nid, success_forward) & set(ends)):
+            errs.append(f"{nid}: success branch cannot reach an end node")
+
+    # Every declared failure branch/compensation path must terminate.
+    for node in nodes:
+        nid = node.get("id")
+        target = node.get("on_failure")
+        if target in idset and not (reachable_from(target, failure_forward) & set(ends)):
+            errs.append(f"{nid}: failure branch {target} cannot reach an end node")
+
     # End nodes must not have dependents/outgoing.
     for end in ends:
         if any(end in n.get("depends_on", []) for n in nodes):
             errs.append(f"end node {end} has dependents")
-    # parallel_group must converge at a common descendant (join).
+        end_node = by_id.get(end, {})
+        if end_node.get("on_success") or end_node.get("on_failure"):
+            errs.append(f"end node {end} has outgoing edges")
+
+    # parallel_group must have a real join that waits for all members or quorum.
     groups = {}
     for node in nodes:
         group = node.get("parallel_group")
@@ -433,22 +489,24 @@ def workflow_graph_errors(wf, catalog=None, stack=(), depth=0):
     for group, members in groups.items():
         if len(members) < 2:
             continue
-        descendant_sets = []
-        for member in members:
-            reachable = {member}
-            todo = [member]
-            while todo:
-                cur = todo.pop()
-                for nxt in forward.get(cur, []):
-                    if nxt not in reachable:
-                        reachable.add(nxt)
-                        todo.append(nxt)
-            descendant_sets.append(reachable)
-        common = set.intersection(*descendant_sets)
-        common.discard(None)
-        common -= set(members)
-        if not common:
-            errs.append(f"parallel_group {group}: no common join descendant")
+        member_set = set(members)
+        descendant_sets = [reachable_from(member, success_forward) for member in members]
+        common = set.intersection(*descendant_sets) - member_set
+        valid_join = False
+        for join_id in common:
+            join_node = by_id.get(join_id, {})
+            join_deps = set(join_node.get("depends_on", []))
+            if join_node.get("join_policy") == "quorum":
+                quorum = join_node.get("quorum")
+                if (isinstance(quorum, int) and 1 <= quorum <= len(member_set)
+                        and len(join_deps & member_set) >= quorum):
+                    valid_join = True
+                    break
+            elif member_set <= join_deps:
+                valid_join = True
+                break
+        if not valid_join:
+            errs.append(f"parallel_group {group}: missing valid join/quorum dependency")
     return errs
 
 
@@ -461,6 +519,8 @@ for path in workflow_files:
         graph_positive += 1
 
 graph_negative = 0
+dag_branch_cases = 0
+parallel_join_cases = 0
 # Unknown dependency.
 bad = copy.deepcopy(base_wf)
 bad["nodes"][0]["depends_on"] = ["missing_node"]
@@ -578,6 +638,7 @@ bad = copy.deepcopy(base_wf)
 bad["nodes"][0]["on_success"] = "missing_target"
 if workflow_graph_errors(bad):
     graph_negative += 1
+    dag_branch_cases += 1
 else:
     check(False, "graph negative 'unknown on_success' should fail")
 
@@ -585,8 +646,78 @@ bad = copy.deepcopy(base_wf)
 bad["nodes"][0]["on_failure"] = "missing_failure_target"
 if workflow_graph_errors(bad):
     graph_negative += 1
+    dag_branch_cases += 1
 else:
     check(False, "graph negative 'unknown on_failure' should fail")
+
+# Success branch terminates, failure branch is dead.
+bad = copy.deepcopy(base_wf)
+base_end = next(n["id"] for n in bad["nodes"] if n.get("type") == "end")
+bad["nodes"].append({"id": "dead_failure", "type": "check"})
+bad["nodes"][0]["on_failure"] = "dead_failure"
+bad["nodes"][0]["on_success"] = base_end
+if workflow_graph_errors(bad):
+    graph_negative += 1
+    dag_branch_cases += 1
+else:
+    check(False, "graph negative 'dead failure branch masked by success branch' should fail")
+
+# Failure branch terminates, success branch is dead.
+bad = copy.deepcopy(base_wf)
+bad["nodes"].append({"id": "dead_success", "type": "check"})
+bad["nodes"][0]["on_success"] = "dead_success"
+bad["nodes"][0]["on_failure"] = base_end
+if workflow_graph_errors(bad):
+    graph_negative += 1
+    dag_branch_cases += 1
+else:
+    check(False, "graph negative 'dead success branch masked by failure branch' should fail")
+
+# Parallel join exists but does not wait for all members.
+feature_wf = load_yaml(next(p for p in workflow_files if load_yaml(p).get("id") == "feature-development"))
+bad = copy.deepcopy(feature_wf)
+for node in bad["nodes"]:
+    if node.get("id") == "quality_gate":
+        node["depends_on"] = ["code_review"]
+if workflow_graph_errors(bad):
+    graph_negative += 1
+    parallel_join_cases += 1
+else:
+    check(False, "graph negative 'join missing member dependency' should fail")
+
+# Only one parallel branch reaches the join.
+bad_parallel_one = {
+    "id": "bad-parallel-one", "version": "0.1.0", "status": "tested",
+    "nodes": [
+        {"id": "a", "type": "check", "parallel_group": "g"},
+        {"id": "b", "type": "check", "parallel_group": "g"},
+        {"id": "join", "type": "parallel", "depends_on": ["a"]},
+        {"id": "end_join", "type": "end", "depends_on": ["join"]},
+        {"id": "end_b", "type": "end", "depends_on": ["b"]},
+    ],
+}
+if workflow_graph_errors(bad_parallel_one):
+    graph_negative += 1
+    parallel_join_cases += 1
+else:
+    check(False, "graph negative 'only one branch reaches join' should fail")
+
+# Quorum larger than parallel members.
+bad_parallel_quorum = {
+    "id": "bad-parallel-quorum", "version": "0.1.0", "status": "tested",
+    "nodes": [
+        {"id": "a", "type": "check", "parallel_group": "g"},
+        {"id": "b", "type": "check", "parallel_group": "g"},
+        {"id": "join", "type": "parallel", "depends_on": ["a", "b"],
+         "join_policy": "quorum", "quorum": 3},
+        {"id": "end_join", "type": "end", "depends_on": ["join"]},
+    ],
+}
+if workflow_graph_errors(bad_parallel_quorum):
+    graph_negative += 1
+    parallel_join_cases += 1
+else:
+    check(False, "graph negative 'parallel quorum larger than members' should fail")
 
 # parallel_group without common join.
 bad_parallel = {
@@ -600,6 +731,7 @@ bad_parallel = {
 }
 if workflow_graph_errors(bad_parallel):
     graph_negative += 1
+    parallel_join_cases += 1
 else:
     check(False, "graph negative 'parallel without join' should fail")
 
@@ -609,6 +741,7 @@ bad_quorum["nodes"][0]["join_policy"] = "quorum"
 bad_quorum["nodes"][0]["quorum"] = 5
 if workflow_graph_errors(bad_quorum):
     graph_negative += 1
+    parallel_join_cases += 1
 else:
     check(False, "graph negative 'quorum out of range' should fail")
 
@@ -617,6 +750,7 @@ bad_quorum2 = copy.deepcopy(base_wf)
 bad_quorum2["nodes"][0]["quorum"] = 1
 if workflow_graph_errors(bad_quorum2):
     graph_negative += 1
+    parallel_join_cases += 1
 else:
     check(False, "graph negative 'quorum without join_policy' should fail")
 
@@ -939,15 +1073,28 @@ parallel_cases += 1
 # 5b. Root vs node Task Context (ADR-005 alignment)
 # ---------------------------------------------------------------------------
 task_context_cases = 0
-root_task = next((load_json(p) for p in task_files if load_json(p).get("context_scope") == "root"), None)
-node_succeeded = next((load_json(p) for p in task_files if load_json(p).get("status") == "SUCCEEDED"), None)
+root_task = next((load_json(p) for p in task_files if load_json(p).get("context_scope") == "root"
+                  and load_json(p).get("context_status") != "completed"), None)
+node_succeeded = next((load_json(p) for p in task_files if load_json(p).get("status") == "SUCCEEDED"
+                       and load_json(p).get("context_scope") == "node"), None)
+root_completed = next((load_json(p) for p in task_files if load_json(p).get("context_scope") == "root"
+                       and load_json(p).get("context_status") == "completed"), None)
 check(root_task is not None, "task-context: root task example missing")
 task_context_cases += 1
 check(node_succeeded is not None, "task-context: succeeded node task example missing")
 task_context_cases += 1
+check(root_completed is not None, "task-context: completed root example missing")
+task_context_cases += 1
 if root_task and node_succeeded:
-    check(node_succeeded.get("parent_task_id") == root_task.get("task_id"),
+    check(root_task.get("context_scope") == "root" and root_task.get("parent_task_id") is None,
+          "task-context: root context must not have parent_task_id")
+    task_context_cases += 1
+    check(node_succeeded.get("context_scope") == "node"
+          and node_succeeded.get("parent_task_id") == root_task.get("task_id"),
           "task-context: node task must reference root task via parent_task_id")
+    task_context_cases += 1
+    check(root_task.get("workflow_verified") is False,
+          "task-context: running root must not claim workflow verification")
     task_context_cases += 1
 
     def root_context_after_node(root, node, workflow_verified=False,
@@ -970,6 +1117,10 @@ if root_task and node_succeeded:
     check(node_succeeded.get("context_status") == "completed"
           and root_task.get("context_status") != "completed",
           "task-context: node local context_status must not be root lifecycle")
+    task_context_cases += 1
+if root_completed:
+    check(root_completed.get("workflow_verified") is True,
+          "task-context: completed root must have workflow_verified=true")
     task_context_cases += 1
 
 # ---------------------------------------------------------------------------
@@ -1137,21 +1288,50 @@ def tool_allowed(declared_tools, requested_tool):
 
 
 def normalize_path(path, symlinks=None):
-    if not isinstance(path, str) or not path:
+    """Resolve path components, including intermediate and nested symlinks."""
+    if not isinstance(path, str) or not path.strip():
         return None
     p = path.replace("\\", "/")
     if p.startswith("/") or re.match(r"^[A-Za-z]:/", p):
         return None
-    norm = posixpath.normpath(p)
+    links = {}
+    if symlinks:
+        for key, value in symlinks.items():
+            nk = posixpath.normpath(key.replace("\\", "/"))
+            links[nk] = value
+    parts = [x for x in p.split("/") if x not in ("", ".")]
+    resolved = []
+    seen_links = set()
+    hops = 0
+    i = 0
+    while i < len(parts):
+        part = parts[i]
+        if part == "..":
+            if not resolved:
+                return None
+            resolved.pop()
+            i += 1
+            continue
+        candidate = "/".join(resolved + [part])
+        if candidate in links:
+            hops += 1
+            if hops > 32 or candidate in seen_links:
+                return None
+            seen_links.add(candidate)
+            target = links[candidate].replace("\\", "/")
+            if target.startswith("/") or re.match(r"^[A-Za-z]:/", target):
+                return None
+            target_parts = [x for x in target.split("/") if x not in ("", ".")]
+            # Relative target is resolved from the symlink's parent directory.
+            parts = resolved + target_parts + parts[i + 1:]
+            resolved = []
+            i = 0
+            continue
+        resolved.append(part)
+        i += 1
+    norm = "/".join(resolved)
     if norm == ".." or norm.startswith("../") or norm.startswith("/"):
         return None
-    if symlinks and norm in symlinks:
-        target = symlinks[norm].replace("\\", "/")
-        if target.startswith("/") or re.match(r"^[A-Za-z]:/", target):
-            return None
-        norm = posixpath.normpath(target)
-        if norm == ".." or norm.startswith("../") or norm.startswith("/"):
-            return None
     return norm
 
 
@@ -1163,10 +1343,49 @@ def path_allowed(task_id, path, symlinks=None):
     return norm == root or norm.startswith(root + "/")
 
 
+def canonical_scope(value):
+    return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+
+
+def is_nonempty(value):
+    return isinstance(value, str) and value.strip() != ""
+
+
+def scope_requires_nonempty(approval):
+    if approval.get("type") in {"sa", "both"}:
+        return True
+    return approval.get("type") == "gate" and approval.get("gate") == "G6"
+
+
+def approval_scope_valid(approval):
+    scope = approval.get("scope")
+    if not isinstance(scope, dict):
+        return False
+    if scope_requires_nonempty(approval) and len(scope) == 0:
+        return False
+    return True
+
+
 def scope_matches(approval_scope, requested_scope):
     if not isinstance(approval_scope, dict) or not isinstance(requested_scope, dict):
         return False
-    return all(requested_scope.get(k) == v for k, v in approval_scope.items())
+    # Exact canonical match: no implicit subset/superset authorization.
+    return canonical_scope(approval_scope) == canonical_scope(requested_scope)
+
+
+def parse_timestamp(value):
+    if not isinstance(value, str) or not value.strip():
+        return None
+    text = value.strip()
+    if text.endswith("Z"):
+        text = text[:-1] + "+00:00"
+    try:
+        dt = datetime.fromisoformat(text)
+    except ValueError:
+        return None
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc)
 
 
 def approval_usable(approval, ctx):
@@ -1175,12 +1394,29 @@ def approval_usable(approval, ctx):
     for key in ("task_id", "workflow_id", "node_id", "operation", "target", "environment"):
         if approval.get(key) != ctx.get(key):
             return False
+    if not approval_scope_valid(approval):
+        return False
     if not scope_matches(approval.get("scope", {}), ctx.get("scope", {})):
         return False
-    if approval.get("subject_hash") and approval.get("subject_hash") != ctx.get("subject_hash"):
-        return False
-    if approval.get("expires_at") and approval["expires_at"] <= ctx.get("now", ""):
-        return False
+
+    approval_hash = approval.get("subject_hash") or ""
+    context_hash = ctx.get("subject_hash") or ""
+    subject_required = bool(ctx.get("subject_required", False)) or approval.get("gate") in {"G4", "G5", "G6"}
+    if subject_required:
+        if not (is_nonempty(approval_hash) and is_nonempty(context_hash)
+                and approval_hash == context_hash):
+            return False
+    else:
+        if bool(approval_hash) != bool(context_hash):
+            return False
+        if approval_hash and approval_hash != context_hash:
+            return False
+
+    expires = parse_timestamp(approval.get("expires_at"))
+    now = parse_timestamp(ctx.get("now"))
+    if expires is not None:
+        if now is None or now >= expires:
+            return False
     if approval.get("consumed_at") is not None:
         return False
     return approval.get("single_use") is True
@@ -1191,12 +1427,14 @@ class ApprovalStore:
         self.approval = copy.deepcopy(approval)
         self.lock = threading.Lock()
 
-    def consume(self, actor, now, ref):
+    def consume(self, actor, ctx, ref):
         with self.lock:
             if self.approval.get("status") != "APPROVED" or self.approval.get("consumed_at"):
                 return False
+            if not approval_usable(self.approval, ctx):
+                return False
             self.approval["status"] = "CONSUMED"
-            self.approval["consumed_at"] = now
+            self.approval["consumed_at"] = ctx.get("now")
             self.approval["consumed_by"] = actor
             self.approval["consumption_ref"] = ref
             return True
@@ -1219,33 +1457,69 @@ security_cases += 1
 check(not tool_allowed(["file-read"], "shell:exec:prod"), "security: undeclared tool must be denied")
 security_cases += 1
 task_for_path = "task-20261120-a1b2c3d4"
-check(path_allowed(task_for_path, "artifacts/task-20261120-a1b2c3d4/design/design.md"),
-      "security: own task path should be allowed")
-security_cases += 1
-check(not path_allowed(task_for_path, "artifacts/task-20261120-a1b2c3d4/../task-20261120-ffffffff/secret.md"),
-      "security: path traversal into another task must be denied")
-security_cases += 1
-check(not path_allowed(task_for_path, "/etc/passwd"), "security: absolute unix path must be denied")
-security_cases += 1
-check(not path_allowed(task_for_path, "C:\\Windows\\win.ini"),
-      "security: absolute Windows path must be denied")
-security_cases += 1
-check(not path_allowed(task_for_path, "artifacts/task-20261120-ffffffff/secret.md"),
-      "security: other task path must be denied")
-security_cases += 1
-symlinks = {
+path_cases = 0
+
+
+def path_assert(cond, msg):
+    global path_cases, security_cases
+    check(cond, msg)
+    path_cases += 1
+    security_cases += 1
+
+
+path_assert(path_allowed(task_for_path, "artifacts/task-20261120-a1b2c3d4/design/design.md"),
+            "security: own task path should be allowed")
+path_assert(not path_allowed(task_for_path, "artifacts/task-20261120-a1b2c3d4/../task-20261120-ffffffff/secret.md"),
+            "security: path traversal into another task must be denied")
+path_assert(not path_allowed(task_for_path, "/etc/passwd"),
+            "security: absolute unix path must be denied")
+path_assert(not path_allowed(task_for_path, "C:\\Windows\\win.ini"),
+            "security: absolute Windows path must be denied")
+path_assert(not path_allowed(task_for_path, "artifacts/task-20261120-ffffffff/secret.md"),
+            "security: other task path must be denied")
+
+# Symlink directory itself.
+symlinks_dir = {
     "artifacts/task-20261120-a1b2c3d4/link":
-        "../task-20261120-ffffffff/secret.md"
+        "../task-20261120-ffffffff"
 }
-check(not path_allowed(task_for_path, "artifacts/task-20261120-a1b2c3d4/link", symlinks),
-      "security: symlink escaping task directory must be denied")
-security_cases += 1
+path_assert(not path_allowed(task_for_path, "artifacts/task-20261120-a1b2c3d4/link", symlinks_dir),
+            "security: symlink directory escaping task must be denied")
+# File under a symlinked directory.
+path_assert(not path_allowed(task_for_path, "artifacts/task-20261120-a1b2c3d4/link/secret.md", symlinks_dir),
+            "security: child under symlinked directory must be denied")
+# Nested/multi-level symlinks, including a symlinked child file.
+symlinks_nested = {
+    "artifacts/task-20261120-a1b2c3d4/dir1": "dir2",
+    "artifacts/task-20261120-a1b2c3d4/dir2/secret.md": "../../../other/secret.md",
+}
+path_assert(not path_allowed(task_for_path, "artifacts/task-20261120-a1b2c3d4/dir1/secret.md", symlinks_nested),
+            "security: nested symlink escaping task must be denied")
+symlinks_chain = {
+    "artifacts/task-20261120-a1b2c3d4/dir1": "dir2",
+    "artifacts/task-20261120-a1b2c3d4/dir2": "dir3",
+    "artifacts/task-20261120-a1b2c3d4/dir3/secret.md": "../../../etc/passwd",
+}
+path_assert(not path_allowed(task_for_path, "artifacts/task-20261120-a1b2c3d4/dir1/secret.md", symlinks_chain),
+            "security: multi-level symlink escaping project must be denied")
+# Symlink cycle.
+symlinks_cycle = {
+    "artifacts/task-20261120-a1b2c3d4/loop1": "loop2",
+    "artifacts/task-20261120-a1b2c3d4/loop2": "loop1",
+}
+path_assert(not path_allowed(task_for_path, "artifacts/task-20261120-a1b2c3d4/loop1/secret.md", symlinks_cycle),
+            "security: symlink cycle must be denied")
+# Relative escape and absolute symlink target.
 symlinks_escape = {
     "artifacts/task-20261120-a1b2c3d4/link": "../../etc/passwd"
 }
-check(not path_allowed(task_for_path, "artifacts/task-20261120-a1b2c3d4/link", symlinks_escape),
-      "security: symlink escaping project root must be denied")
-security_cases += 1
+path_assert(not path_allowed(task_for_path, "artifacts/task-20261120-a1b2c3d4/link", symlinks_escape),
+            "security: relative symlink escape must be denied")
+symlinks_absolute = {
+    "artifacts/task-20261120-a1b2c3d4/link": "/etc/passwd"
+}
+path_assert(not path_allowed(task_for_path, "artifacts/task-20261120-a1b2c3d4/link", symlinks_absolute),
+            "security: absolute symlink target must be denied")
 
 approval_file = next((p for p in approval_files if "approved" in p.name), approval_files[0] if approval_files else None)
 approval = load_json(approval_file) if approval_file else {}
@@ -1259,10 +1533,26 @@ approval_ctx = {
     "environment": approval.get("environment"),
     "scope": copy.deepcopy(approval.get("scope", {})),
     "subject_hash": approval.get("subject_hash"),
+    "subject_required": True,
     "now": base_now,
 }
-check(approval_usable(approval, approval_ctx), "security: valid approval should be usable")
-security_cases += 1
+approval_cases = 0
+scope_cases = 0
+expiry_cases = 0
+
+
+def approval_assert(cond, msg, category=None):
+    global approval_cases, security_cases, scope_cases, expiry_cases
+    check(cond, msg)
+    approval_cases += 1
+    security_cases += 1
+    if category == "scope":
+        scope_cases += 1
+    elif category == "expiry":
+        expiry_cases += 1
+
+
+approval_assert(approval_usable(approval, approval_ctx), "security: valid approval should be usable")
 for key, value in (
     ("task_id", "task-20261120-ffffffff"),
     ("workflow_id", "bug-fix"),
@@ -1276,31 +1566,165 @@ for key, value in (
 ):
     ctx = dict(approval_ctx)
     ctx[key] = value
-    check(not approval_usable(approval, ctx),
-          f"security: approval must be invalid for changed {key}")
-    security_cases += 1
+    approval_assert(not approval_usable(approval, ctx),
+                    f"security: approval must be invalid for changed {key}")
+
+# subject_hash: bidirectional binding.
+approval_no_hash = copy.deepcopy(approval)
+approval_no_hash["subject_hash"] = None
+approval_assert(not approval_usable(approval_no_hash, approval_ctx),
+                "security: required subject_hash missing from approval must fail")
+approval_empty_hash = copy.deepcopy(approval)
+approval_empty_hash["subject_hash"] = ""
+approval_assert(not approval_usable(approval_empty_hash, approval_ctx),
+                "security: required subject_hash empty from approval must fail")
+ctx_no_hash = dict(approval_ctx)
+ctx_no_hash["subject_hash"] = None
+approval_assert(not approval_usable(approval, ctx_no_hash),
+                "security: required subject_hash missing from context must fail")
+ctx_empty_hash = dict(approval_ctx)
+ctx_empty_hash["subject_hash"] = ""
+approval_assert(not approval_usable(approval, ctx_empty_hash),
+                "security: required subject_hash empty from context must fail")
+ctx_diff_hash = dict(approval_ctx)
+ctx_diff_hash["subject_hash"] = "e" * 40
+approval_assert(not approval_usable(approval, ctx_diff_hash),
+                "security: different subject_hash must fail")
+ctx_not_required_no_hash = dict(approval_ctx)
+ctx_not_required_no_hash["subject_required"] = False
+ctx_not_required_no_hash["subject_hash"] = None
+approval_assert(not approval_usable(approval, ctx_not_required_no_hash),
+                "security: approval hash with missing context hash must fail even if not required")
+approval_assert(not approval_usable(approval_no_hash, ctx_not_required_no_hash),
+                "security: one-sided missing hash must fail")
+
+# Scope: exact canonical match, empty is not unlimited.
+base_scope = approval.get("scope", {})
+approval_assert(scope_matches(base_scope, copy.deepcopy(base_scope)),
+                "security: identical scope should match", "scope")
+for label, changed in (
+    ("added-parameter", {**base_scope, "extra": "value"}),
+    ("resource-change", {**base_scope, "namespace": "other-namespace"}),
+    ("path-change", {**base_scope, "image": "sdd-api:other"}),
+    ("range-expanded", {**base_scope, "replicas": "1-10"}),
+    ("scope-shrunk", {"cluster": base_scope.get("cluster")}),
+    ("scope-expanded", {**base_scope, "network": "host"}),
+):
+    approval_assert(not scope_matches(base_scope, changed),
+                    f"security: scope {label} must not match", "scope")
+approval_assert(not scope_matches({}, {"extra": "value"}),
+                "security: empty approval scope must not authorize non-empty request", "scope")
+low_risk_empty = copy.deepcopy(approval)
+low_risk_empty["type"] = "gate"
+low_risk_empty["gate"] = "G1"
+low_risk_empty["risk_level"] = "low"
+low_risk_empty["scope"] = {}
+low_risk_empty["subject_hash"] = None
+low_risk_ctx = {
+    "task_id": low_risk_empty.get("task_id"),
+    "workflow_id": low_risk_empty.get("workflow_id"),
+    "node_id": low_risk_empty.get("node_id"),
+    "operation": low_risk_empty.get("operation"),
+    "target": low_risk_empty.get("target"),
+    "environment": low_risk_empty.get("environment"),
+    "scope": {},
+    "subject_hash": None,
+    "subject_required": False,
+    "now": base_now,
+}
+approval_assert(approval_usable(low_risk_empty, low_risk_ctx),
+                "security: empty scope may match only empty low-risk request", "scope")
+low_risk_ctx_nonempty = dict(low_risk_ctx)
+low_risk_ctx_nonempty["scope"] = {"extra": "value"}
+approval_assert(not approval_usable(low_risk_empty, low_risk_ctx_nonempty),
+                "security: empty approval scope must not authorize non-empty request", "scope")
+
+pure_file = next((p for p in approval_files if "pure" in p.name), None)
+if pure_file:
+    pure = load_json(pure_file)
+    pure_ctx = {
+        "task_id": pure.get("task_id"),
+        "workflow_id": pure.get("workflow_id"),
+        "node_id": pure.get("node_id"),
+        "operation": pure.get("operation"),
+        "target": pure.get("target"),
+        "environment": pure.get("environment"),
+        "scope": copy.deepcopy(pure.get("scope", {})),
+        "subject_hash": None,
+        "subject_required": False,
+        "now": "2026-11-20T13:05:00Z",
+    }
+    approval_assert(approval_usable(pure, pure_ctx),
+                    "security: pure SA without subject binding should be usable", "scope")
+high_risk_empty = copy.deepcopy(approval)
+high_risk_empty["scope"] = {}
+approval_assert(not approval_scope_valid(high_risk_empty),
+                "security: high-risk SA with empty scope must be invalid", "scope")
+
+# Expiry: real datetime parsing with timezone offsets and boundary.
+for now_value, expected, label in (
+    ("2026-11-20T11:05:00Z", True, "before"),
+    ("2026-11-20T11:30:00Z", False, "exact-boundary"),
+    ("2026-11-20T11:31:00Z", False, "after"),
+    ("2026-11-20T19:05:00+08:00", True, "offset-before"),
+    ("2026-11-20T19:30:00+08:00", False, "offset-boundary"),
+    ("2026-11-20T19:31:00+08:00", False, "offset-after"),
+):
+    ctx = dict(approval_ctx)
+    ctx["now"] = now_value
+    approval_assert(approval_usable(approval, ctx) is expected,
+                    f"security: expiry {label} result mismatch", "expiry")
+
 consumed = copy.deepcopy(approval)
 consumed["status"] = "CONSUMED"
 consumed["consumed_at"] = "2026-11-20T11:12:00Z"
 consumed["consumed_by"] = "orchestrator-main"
-check(not approval_usable(consumed, approval_ctx),
-      "security: consumed approval must not be usable")
-security_cases += 1
+approval_assert(not approval_usable(consumed, approval_ctx),
+                "security: consumed approval must not be usable")
 rejected = copy.deepcopy(approval)
 rejected["status"] = "REJECTED"
-check(not approval_usable(rejected, approval_ctx),
-      "security: rejected approval must not be usable")
-security_cases += 1
+approval_assert(not approval_usable(rejected, approval_ctx),
+                "security: rejected approval must not be usable")
 
-# Atomic single consumption, including concurrent duplicate consumption.
+# Atomic consumption validates binding/expiry inside the critical section.
+consume_ctx = dict(approval_ctx)
+consume_ctx["now"] = "2026-11-20T11:12:00Z"
 store = ApprovalStore(approval)
+approval_assert(store.consume("worker-a", consume_ctx, "consume-ref"),
+                "security: valid approval should consume once")
+approval_assert(store.approval["status"] == "CONSUMED",
+                "security: consumed approval must be CONSUMED")
+approval_assert(store.approval.get("consumed_at") and store.approval.get("consumed_by"),
+                "security: consumed approval must record consumed_at/consumed_by")
+approval_assert(not store.consume("worker-b", consume_ctx, "consume-ref-2"),
+                "security: second consumption must fail")
+approval_assert(not approval_usable(store.approval, approval_ctx),
+                "security: consumed approval must not be usable after consumption")
+
+bad_binding_ctx = dict(consume_ctx)
+bad_binding_ctx["scope"] = {"cluster": "prod-cluster-eu"}
+store_bad = ApprovalStore(approval)
+approval_assert(not store_bad.consume("worker-a", bad_binding_ctx, "bad-ref"),
+                "security: consume must reject wrong scope inside lock")
+approval_assert(store_bad.approval["status"] == "APPROVED",
+                "security: failed consume must not change approval status")
+expired_ctx = dict(consume_ctx)
+expired_ctx["now"] = "2026-11-20T12:00:00Z"
+store_expired = ApprovalStore(approval)
+approval_assert(not store_expired.consume("worker-a", expired_ctx, "expired-ref"),
+                "security: consume must reject expired approval inside lock")
+approval_assert(store_expired.approval["status"] == "APPROVED",
+                "security: expired consume must not change approval status")
+
+# Concurrent duplicate consumption: exactly one success.
+store_concurrent = ApprovalStore(approval)
 barrier = threading.Barrier(2)
 results = []
 
 
 def consume_worker():
     barrier.wait()
-    results.append(store.consume("worker-a", "2026-11-20T11:12:00Z", "consume-ref"))
+    results.append(store_concurrent.consume("worker-a", consume_ctx, "consume-ref"))
 
 
 threads = [threading.Thread(target=consume_worker) for _ in range(2)]
@@ -1308,19 +1732,10 @@ for t in threads:
     t.start()
 for t in threads:
     t.join()
-check(results.count(True) == 1, "security: concurrent consumption must succeed exactly once")
-security_cases += 1
-check(store.approval["status"] == "CONSUMED", "security: consumed approval must be CONSUMED")
-security_cases += 1
-check(store.approval.get("consumed_at") and store.approval.get("consumed_by"),
-      "security: consumed approval must record consumed_at/consumed_by")
-security_cases += 1
-check(not store.consume("worker-b", "2026-11-20T11:13:00Z", "consume-ref-2"),
-      "security: second consumption must fail")
-security_cases += 1
-check(not approval_usable(store.approval, approval_ctx),
-      "security: consumed approval must not be usable after consumption")
-security_cases += 1
+approval_assert(results.count(True) == 1,
+                "security: concurrent consumption must succeed exactly once")
+approval_assert(store_concurrent.approval["status"] == "CONSUMED",
+                "security: concurrent consumption must leave CONSUMED")
 check(SECRET_RE.search("password=supersecret123") is not None,
       "security: secret detection should catch password assignment")
 security_cases += 1
@@ -1426,6 +1841,8 @@ print(f"workflow_graph_positive={graph_positive} workflow_graph_negative={graph_
 print(f"state_transitions_positive={state_positive} state_transitions_negative={state_negative}")
 print(f"transition_definitions={transition_definitions} transition_tests={transition_tests} guard_cases={guard_cases}")
 print(f"parallel_cases={parallel_cases} task_context_cases={task_context_cases} gate_cases={gate_cases}")
+print(f"approval_cases={approval_cases} scope_cases={scope_cases} expiry_cases={expiry_cases} path_cases={path_cases}")
+print(f"dag_branch_cases={dag_branch_cases} parallel_join_cases={parallel_join_cases}")
 print(f"failure_cases={failure_cases} security_cases={security_cases}")
 print(f"yaml_blocks_checked={yaml_blocks} registry_ids={len(found_registry)}")
 print("runtime_behavior=NOT_EXECUTED")

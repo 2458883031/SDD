@@ -101,8 +101,8 @@ P1-002 区分以下状态，不得混用：
 1. Workflow Run 拥有独立的根 Task Context；根 `task-status` 按 ADR-005 生命周期演进。
 2. 节点级 Task 拥有 scoped Context，`parent_task_id` 指向根任务；节点 Context 不拥有 Run 的全局完成权。
 3. 节点 Task 进入 `SUCCEEDED` 只更新节点本地状态和本地 `context_status`，不得把根 `task-status` 写成 `completed`。
-4. 根 Context 只有在所有必需 Task 成功/允许跳过、必需 Gate 通过、Workflow 级验证完成后，才能从 `verifying` 进入 `completed`。
-5. `context_scope=root` 的 `context_status` 是权威生命周期；`context_scope=node` 的 `context_status` 只是本地投影。
+4. 根 Context 只有在所有必需 Task 成功/允许跳过、必需 Gate 通过、Workflow 级验证完成后，才能从 `verifying` 进入 `completed`；Schema 要求根 `context_status=completed` 时 `workflow_verified=true`。
+5. `context_scope=root` 的 `context_status` 是权威生命周期；`context_scope=node` 的 `context_status` 只是本地投影。root 不得有 `parent_task_id`，node 必须有有效根 Task ID 格式的 `parent_task_id`。
 
 ---
 

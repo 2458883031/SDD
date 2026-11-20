@@ -10,6 +10,7 @@
   "status": "RUNNING",
   "context_status": "executing",
   "context_scope": "root",
+  "workflow_verified": false,
   "complexity": "L2",
   "risk_level": "medium",
   "permission_level": "R1",

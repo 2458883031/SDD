@@ -85,6 +85,26 @@
         },
         "required": ["consumed_at", "consumed_by"]
       }
+    },
+    {
+      "if": {
+        "anyOf": [
+          {
+            "properties": { "type": { "enum": ["sa", "both"] } },
+            "required": ["type"]
+          },
+          {
+            "properties": {
+              "type": { "const": "gate" },
+              "gate": { "const": "G6" }
+            },
+            "required": ["type", "gate"]
+          }
+        ]
+      },
+      "then": {
+        "properties": { "scope": { "minProperties": 1 } }
+      }
     }
   ],
   "$defs": {

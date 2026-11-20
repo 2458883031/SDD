@@ -44,6 +44,11 @@
       "enum": ["root", "node"],
       "description": "root = Workflow Run 根 Task Context；node = 节点级 Task Context，不得直接设置根 completed"
     },
+    "workflow_verified": {
+      "type": "boolean",
+      "default": false,
+      "description": "仅根 Context 使用；根 Context completed 时必须为 true"
+    },
     "complexity": { "type": "string", "enum": ["L1", "L2", "L3"] },
     "risk_level": { "type": "string", "enum": ["low", "medium", "high", "critical"] },
     "permission_level": { "type": "string", "enum": ["R0", "R1", "R2", "R3", "R4"] },
@@ -118,6 +123,41 @@
       "then": {
         "properties": { "started_at": { "type": "string", "format": "date-time" } },
         "required": ["started_at"]
+      }
+    },
+    {
+      "if": { "properties": { "context_scope": { "const": "root" } }, "required": ["context_scope"] },
+      "then": {
+        "properties": { "parent_task_id": { "type": "null" } }
+      }
+    },
+    {
+      "if": { "properties": { "context_scope": { "const": "node" } }, "required": ["context_scope"] },
+      "then": {
+        "properties": {
+          "parent_task_id": {
+            "type": "string",
+            "pattern": "^task-[0-9]{8}-[a-z0-9]{4,36}$"
+          },
+          "context_status": {
+            "type": "string",
+            "enum": ["created", "planned", "executing", "awaiting_approval", "completed", "failed", "aborted"]
+          }
+        },
+        "required": ["parent_task_id"]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "context_scope": { "const": "root" },
+          "context_status": { "const": "completed" }
+        },
+        "required": ["context_scope", "context_status"]
+      },
+      "then": {
+        "properties": { "workflow_verified": { "const": true } },
+        "required": ["workflow_verified"]
       }
     }
   ],

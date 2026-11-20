@@ -69,6 +69,32 @@ Approval 必须绑定：
 
 任何一项变化 → Approval 失效，必须重新申请。
 
+### 2.2 Scope 与 subject_hash 语义
+
+**Scope：**
+
+- Approval Scope 是**完整授权范围**，不是“至少包含”范围。
+- 当前模型采用**规范化后的完整 Scope 精确匹配**（排序后的 JSON 语义）；不采用无约束子集/超集授权。
+- 空 Scope **不表示无限授权**：空 Scope 只能匹配空请求；高风险 SA/G6 必须有非空 Scope。
+- 请求新增参数、资源、路径、目标、扩大参数范围，均视为新范围，必须重新审批。
+- Scope 缩小同样不匹配；如需缩小范围，重新申请并记录新 Scope。
+
+**subject_hash：**
+
+1. 如果当前操作需要代码/产物绑定，Approval 必须有非空 `subject_hash`，且与上下文完全一致。
+2. Approval 有 `subject_hash` 而上下文没有/为空 → 拒绝。
+3. 上下文有 `subject_hash` 而 Approval 没有/为空 → 拒绝。
+4. 仅当操作明确不涉及代码/产物绑定时，双方均不提供 `subject_hash` 才允许。
+5. G4/G5/G6 相关 Approval 必须提供非空 `subject_hash`。
+
+### 2.3 时间与原子消费
+
+- `expires_at`/`now` 使用 ISO 8601 解析，统一转换为 UTC 后比较；支持 `Z` 和时区偏移。
+- `now >= expires_at` 即视为过期；临界时刻不得使用。
+- 消费必须在**原子临界区**内验证：状态、有效期、Task、Workflow、Node、Operation、Target、Environment、Scope、subject_hash。
+- 校验与消费之间不得存在重复消费窗口；并发消费只能一个成功。
+- 本节的锁/原子性测试只代表静态校验器实现，不代表生产级分布式原子保证。
+
 ---
 
 ## 3. 发起与批准权限
@@ -155,7 +181,7 @@ APPROVED → EXPIRED / REVOKED / INVALIDATED
 
 ## 7. 防复用与防自批
 
-1. Approval 单次使用；消费时必须以原子操作从 `APPROVED` 转为 `CONSUMED`，并记录 `consumed_at`、`consumed_by`、`consumption_ref`。
+1. Approval 单次使用；消费时必须在原子临界区内重新验证状态、有效期、Task/Workflow/Node/Operation/Target/Environment/Scope/subject_hash，再从 `APPROVED` 转为 `CONSUMED`。
 2. 同一 Approval 的并发消费只能有一个成功；其他请求返回 `already_consumed`，不得重复执行副作用。
 3. 不得跨 Task、跨操作、跨目标、跨产物复用。
 4. 不得把 G6 批准用于非部署操作；不得把 SA 当作 G6。
@@ -204,13 +230,15 @@ APPROVED → EXPIRED / REVOKED / INVALIDATED
 1. 超时/沉默/默认值不等于批准。
 2. Agent 不得自批高风险操作。
 3. Approval 单次使用，绑定 task/operation/target/scope/subject_hash。
-4. `APPROVED → CONSUMED` 只能成功一次；并发消费只能一个成功。
-5. 过期/失效/已消费的 Approval 不得使用。
-6. 拒绝后不得绕过。
-7. 未批准时高风险操作必须 BLOCKED。
-8. 审批不授予权限，不替代 R0–R4 检查。
-9. G6 仅生产部署触发；非生产部署不得要求 G6。
-10. 审批记录追加写入、脱敏；不得批量/通配批准高风险操作。
+4. Scope 必须规范化后精确匹配；空 Scope 不是无限授权；高风险 SA/G6 必须有非空 Scope。
+5. subject_hash 必须双向绑定；一方缺失/为空而另一方存在时拒绝。
+6. `APPROVED → CONSUMED` 只能成功一次；并发消费只能一个成功。
+7. 过期/失效/已消费的 Approval 不得使用；时间比较统一为 UTC。
+8. 拒绝后不得绕过。
+9. 未批准时高风险操作必须 BLOCKED。
+10. 审批不授予权限，不替代 R0–R4 检查。
+11. G6 仅生产部署触发；非生产部署不得要求 G6。
+12. 审批记录追加写入、脱敏；不得批量/通配批准高风险操作。
 
 ---
 

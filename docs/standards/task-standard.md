@@ -37,6 +37,7 @@ Task **不是**：
 | `status` | 是 | enum | 执行状态：PENDING/READY/RUNNING/WAITING/BLOCKED/SUCCEEDED/FAILED/CANCELLED |
 | `context_status` | 是 | enum | ADR-005 `task-status` 投影；node 作用域下仅本地，不代表根完成 |
 | `context_scope` | 是 | enum | `root`（Workflow Run 根 Context）或 `node`（节点级 Task Context） |
+| `workflow_verified` | 条件 | boolean | 仅根 Context 使用；根 `context_status=completed` 时必须为 true |
 | `complexity` | 是 | enum | L1/L2/L3 |
 | `risk_level` | 是 | enum | low/medium/high/critical |
 | `permission_level` | 是 | enum | R0/R1/R2/R3/R4 |
@@ -68,7 +69,8 @@ P1-002 将 Task 定义为 Workflow 节点级可调度单元，而 ADR-005 的 `t
 1. **Workflow Run 拥有独立的根 Task Context。** 根 Task Context 的 `task_id` 是 Run 的根任务 ID，`task-status` 按 ADR-005 的 `created → planned → executing → verifying → completed/failed/aborted` 演进。
 2. **节点级 Task 拥有独立的 scoped Task Context。** 每个节点 Task 的 `parent_task_id` 指向根任务 ID；节点 Context 只保存该节点的输入/输出/执行状态，不拥有 Run 的全局完成权。
 3. **节点 Task SUCCEEDED 不得把根 Task Context 设置为 completed。** 节点完成只更新节点 `status`/本地 `context_status`；根 `task-status` 仍为 `executing`（或 `verifying`）。
-4. **只有 Workflow 级验证完成后，根 Task Context 才能进入 `completed`。** 必需 Task 成功/允许跳过、必需 Gate 通过、Workflow 验证完成后，根 Context 才能 `verifying → completed`。
+4. **只有 Workflow 级验证完成后，根 Task Context 才能进入 `completed`。** 必需 Task 成功/允许跳过、必需 Gate 通过、Workflow 验证完成后，根 Context 才能 `verifying → completed`；Schema 要求根 `context_status=completed` 时 `workflow_verified=true`。
+5. **Schema 约束：** `context_scope=root` 时 `parent_task_id` 必须为空/省略；`context_scope=node` 时 `parent_task_id` 必须为有效根 Task ID 格式；node 不使用 `verifying`，且节点 `context_status` 只是本地投影。
 5. **映射规则：**
    - `context_scope=root`：`context_status` 是权威 ADR-005 生命周期，`status` 是调度投影。
    - `context_scope=node`：`status` 是节点执行状态；`context_status` 只是节点本地投影，不得写入根 Context。

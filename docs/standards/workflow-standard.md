@@ -95,6 +95,8 @@ Workflow 由 Orchestrator 解释和执行；节点通过 `depends_on` 组织 DAG
 8. `parallel_group` 内节点必须共享明确的汇合点；不得无限并行。
 9. `condition` 只能读取显式上下文；不得依赖隐藏全局状态。
 10. `on_success`/`on_failure` 只能指向存在的节点或终止语义。
+11. 每条成功分支必须能到达 `end`；每条已声明的失败/补偿分支必须能到达 `end` 或明确失败终态，不能由另一条分支的可达性掩盖。
+12. `parallel_group` 必须有真正的 join：join 直接依赖全部成员，或按 `join_policy=quorum` 满足明确 quorum；仅有共同后代不足以认定汇合有效。
 
 **不允许：**
 
@@ -327,6 +329,7 @@ Workflow 由 Orchestrator 解释和执行；节点通过 `depends_on` 组织 DAG
 ### 7.6 结果汇总
 
 - 聚合策略：`all`（全部成功）、`any`（任一成功）、`quorum`（达到阈值）。
+- 并行组的 join 必须直接依赖全部成员，或明确声明 `join_policy=quorum` 并满足 quorum；不能只凭存在共同后代认定汇合。
 - 聚合结果必须记录每个分支的状态、Artifact 引用和证据。
 - 冲突/缺失/哈希不匹配 → 聚合失败。
 - 质量门禁聚合必须使用 `all`（G4 AND G5），不得用 `any` 或 `quorum` 替代。
@@ -372,14 +375,16 @@ PENDING → RUNNING → SUCCEEDED
 1. 依赖未满足的节点不得执行。
 2. DAG 不得有循环。
 3. Subworkflow 必须固定 `id` + SemVer，禁止递归，组合深度 ≤3。
-4. G4/G5 必须同一 subject hash；新版本使旧结果失效。
-4. 质量门禁必须 G4 AND G5；不得用 Task SUCCEEDED 代替。
-5. 生产部署必须 G6 + R3 + SA。
-6. 非生产部署不得触发 G6。
-7. 终态 Workflow 不得直接恢复。
-8. 同一 Artifact 不得并发多写。
-9. 并行聚合不得静默丢弃失败分支。
-10. 任何跳过/追加/组合都必须记录证据。
+4. 成功分支与失败分支必须分别可终止；不得互相掩盖死路。
+5. parallel_group 的 join 必须等待全部成员或满足明确 quorum。
+6. G4/G5 必须同一 subject hash；新版本使旧结果失效。
+7. 质量门禁必须 G4 AND G5；不得用 Task SUCCEEDED 代替。
+8. 生产部署必须 G6 + R3 + SA。
+9. 非生产部署不得触发 G6。
+10. 终态 Workflow 不得直接恢复。
+11. 同一 Artifact 不得并发多写。
+12. 并行聚合不得静默丢弃失败分支。
+13. 任何跳过/追加/组合都必须记录证据。
 
 ---
 
