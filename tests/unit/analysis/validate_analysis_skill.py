@@ -140,9 +140,8 @@ def analysis_ref_exists(ref, analysis, candidate_ids, risk_ids, design_considera
 
 def resolved_evidence_exists(ref, analysis):
     evidence = set()
+    # Statements are not evidence. Only explicit, traceable references count.
     for fact in analysis.get("facts", []) or []:
-        if fact.get("statement"):
-            evidence.add(fact["statement"])
         evidence.update(fact.get("evidence_refs", []) or [])
     for source_ref in analysis.get("source_refs", []) or []:
         evidence.add(ref_key(source_ref))
@@ -186,7 +185,11 @@ def retained_actual(item, analysis, input_req):
             return True
         return any(source_id in (c.get("dependencies", []) or []) for c in candidates)
     if source_type == "acceptance_criterion":
-        return source_id in (next_steps.get("design_considerations", []) or [])
+        considerations = next_steps.get("design_considerations", []) or []
+        return any(
+            isinstance(value, str) and (value == source_id or value.startswith(source_id + ":"))
+            for value in considerations
+        )
     if source_type in {"functional_requirement", "non_functional_requirement"}:
         return any(source_id in (c.get("applicable_requirements", []) or []) for c in candidates) or \
             source_id in (next_steps.get("design_considerations", []) or [])
@@ -680,6 +683,87 @@ check(not deferred_errs, f"trace-deferred-with-rationale: {deferred_errs[:3]}")
 if not deferred_errs:
     trace_positive_cases += 1
 
+# F3-A: resolved evidence must be an explicit reference, never a statement.
+resolved_negative_cases = 0
+resolved_positive_cases = 0
+
+
+def resolved_output(ref):
+    obj = copy.deepcopy(base)
+    for item in obj["data"]["analysis"]["requirements_traceability"]["items"]:
+        if item.get("source_type") == "non_goal":
+            item.update({"disposition": "resolved", "resolution_evidence_refs": [ref]})
+            break
+    return obj
+
+
+def expect_resolved_failure(label, ref):
+    global resolved_negative_cases
+    errs = validate_analysis_output(resolved_output(ref), label, full_input)
+    check(bool(errs), f"{label}: expected unresolved/invalid evidence rejection")
+    if errs:
+        resolved_negative_cases += 1
+
+
+def expect_resolved_pass(label, ref):
+    global resolved_positive_cases
+    errs = validate_analysis_output(resolved_output(ref), label, full_input)
+    check(not errs, f"{label}: expected valid evidence: {errs[:3]}")
+    if not errs:
+        resolved_positive_cases += 1
+
+
+expect_resolved_failure("resolved-user-stated-statement", "需求要求组合筛选。")
+expect_resolved_failure("resolved-assumption-statement", "现有查询接口可以安全增加过滤参数。")
+expect_resolved_failure("resolved-missing-ref", "missing-evidence-ref")
+only_statement = resolved_output("only a statement")
+only_statement["data"]["analysis"]["facts"] = [
+    {"statement": "only a statement", "source_type": "user_stated", "evidence_refs": []}
+]
+only_statement_errs = validate_analysis_output(only_statement, "resolved-only-statement", full_input)
+check(bool(only_statement_errs), "resolved-only-statement: expected rejection")
+if only_statement_errs:
+    resolved_negative_cases += 1
+
+expect_resolved_pass("resolved-fact-evidence", "docs/architecture/module-architecture.md")
+expect_resolved_pass(
+    "resolved-source-ref",
+    ref_key(base["data"]["analysis"]["source_requirements_ref"]),
+)
+expect_resolved_pass("resolved-risk-evidence", "requirements:NFR-1")
+expect_resolved_pass("resolved-candidate-evidence", "docs/architecture/system-architecture.md")
+
+# F3-B: Acceptance Criterion retained must map to a concrete design consideration.
+acceptance_negative_cases = 0
+acceptance_positive_cases = 0
+
+
+def acceptance_retained_output(design_considerations):
+    obj = copy.deepcopy(base)
+    for item in obj["data"]["analysis"]["requirements_traceability"]["items"]:
+        if item.get("source_type") == "acceptance_criterion":
+            item["disposition"] = "retained"
+            item.pop("analysis_refs", None)
+            break
+    obj["data"]["analysis"]["next_steps"]["design_considerations"] = design_considerations
+    return obj
+
+
+acceptance_ok = acceptance_retained_output(["AC-1: 组合筛选验收标准需映射到测试设计"])
+acceptance_errs = validate_analysis_output(acceptance_ok, "acceptance-retained-design-consideration", full_input)
+check(not acceptance_errs, f"acceptance-retained-design-consideration: {acceptance_errs[:3]}")
+if not acceptance_errs:
+    acceptance_positive_cases += 1
+
+for label, considerations in (
+    ("acceptance-retained-missing-consideration", []),
+    ("acceptance-retained-unrelated-consideration", ["其他设计考虑"]),
+):
+    errs = validate_analysis_output(acceptance_retained_output(considerations), label, full_input)
+    check(bool(errs), f"{label}: expected missing/unrelated consideration rejection")
+    if errs:
+        acceptance_negative_cases += 1
+
 # F2: source binding on all statuses, not only ok.
 partial_input = load_json(SKILL / "examples" / "example-input-partial.json")
 partial_output = load_json(SKILL / "examples" / "example-output-partial.json")
@@ -758,4 +842,6 @@ print(f"input_positive={input_positive} output_positive={output_positive} cases=
 print(f"schema_negative={schema_negative[0]} semantic_negative={semantic_negative[0]}")
 print(f"f1_negative={f1_negative_cases} f1_positive={f1_positive_cases} f2_cases={f2_cases} f3_cases={f3_cases}")
 print(f"trace_negative={trace_negative_cases} trace_positive={trace_positive_cases}")
+print(f"resolved_negative={resolved_negative_cases} resolved_positive={resolved_positive_cases}")
+print(f"acceptance_retained_negative={acceptance_negative_cases} acceptance_retained_positive={acceptance_positive_cases}")
 print("runtime_behavior=NOT_EXECUTED")
