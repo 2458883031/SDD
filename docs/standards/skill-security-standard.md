@@ -55,6 +55,9 @@ Skill 通过统一的 ToolPort 调用工具：
 
 - 只调用 `requires.tools` 中声明的工具类别。
 - 不允许直接调用平台 SDK 或平台 CLI 绕过 ToolPort。
+- 平台工具映射不得绕过 `requires.tools`、`requires.permissions`、R0–R4 或 Artifact 路径限制。
+- `file-read` 通过 ToolPort 映射到平台 `read`；Artifact 写入通过 `artifact-port`/ContextPort，适配器内部 `write` 不暴露为 Skill Tool。
+- `fs:write:project` 权限与 `artifacts/{task-id}/` 路径限制同时生效；不得用平台写工具绕过两者。
 - 不允许把用户输入拼进 Shell 命令；使用参数化调用。
 - 工具调用失败必须返回明确错误；不得静默降级为更高权限操作。
 - 工具结果进入输出前必须脱敏/校验。

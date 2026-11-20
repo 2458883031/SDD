@@ -18,6 +18,29 @@ ROOT = Path(__file__).resolve().parents[3]
 SKILL = ROOT / "skills" / "requirements-clarity"
 errors = []
 
+REGISTRY = {
+    "skill-discovery",
+    "skill-metadata",
+    "tool-invocation",
+    "context-port",
+    "artifact-port",
+    "approval-port",
+    "result-port",
+}
+
+
+class UniqueKeyLoader(yaml.SafeLoader):
+    """SafeLoader that rejects duplicate mapping keys."""
+
+    def construct_mapping(self, node, deep=False):
+        mapping = {}
+        for key_node, value_node in node.value:
+            key = self.construct_object(key_node, deep=deep)
+            if key in mapping:
+                raise ValueError(f"duplicate YAML key: {key!r}")
+            mapping[key] = self.construct_object(value_node, deep=deep)
+        return mapping
+
 
 def check(cond, msg):
     if not cond:
@@ -31,7 +54,18 @@ def load_json(path):
 
 def load_yaml(path):
     with path.open(encoding="utf-8") as f:
-        return yaml.safe_load(f)
+        return yaml.load(f, Loader=UniqueKeyLoader)
+
+
+def check_yaml_blocks(path):
+    text = path.read_text(encoding="utf-8")
+    blocks = re.findall(r"```yaml\n(.*?)```", text, re.S)
+    for i, block in enumerate(blocks):
+        try:
+            list(yaml.load_all(block, Loader=UniqueKeyLoader))
+        except Exception as e:
+            errors.append(f"{path.name} yaml block {i + 1}: {e}")
+    return len(blocks)
 
 
 SEMVER_RE = re.compile(
@@ -61,7 +95,12 @@ check(manifest.get("name") == "requirements-clarity", "skill.yaml: name mismatch
 check(manifest.get("schema_version") == 1, "skill.yaml: schema_version must be 1")
 check(valid_semver(str(manifest.get("version", ""))), "skill.yaml: invalid SemVer")
 check(manifest.get("status") in {"draft", "review", "tested", "published", "deprecated", "retired", "archived"}, "skill.yaml: invalid status")
-check(manifest.get("compatibility", {}).get("requires_capabilities") == ["skill-discovery", "skill-metadata", "tool-invocation", "context-port", "artifact-port"], "skill.yaml: capability registry mismatch")
+check(manifest.get("compatibility", {}).get("requires_capabilities") == ["skill-discovery", "skill-metadata", "tool-invocation", "context-port", "artifact-port", "result-port"], "skill.yaml: capability registry mismatch")
+req_caps = manifest.get("compatibility", {}).get("requires_capabilities", [])
+opt_caps = manifest.get("compatibility", {}).get("optional_capabilities", [])
+check(set(req_caps) <= REGISTRY, "skill.yaml: unknown required capability")
+check(set(opt_caps) <= REGISTRY, "skill.yaml: unknown optional capability")
+check(manifest.get("dependencies", {}).get("tools") == ["file-read"], "skill.yaml: tool mapping must be file-read")
 
 # 2. JSON Schema checks
 input_schema = load_json(SKILL / "schemas" / "input.schema.json")
@@ -129,7 +168,34 @@ check(platform.get("platform") == "openclaw", "platform metadata: platform misma
 entry = platform.get("skills", {}).get("requirements-clarity", {})
 for key in ("discovery", "trigger", "requirements", "invocation", "approval", "capabilities"):
     check(key in entry, f"platform metadata: missing {key}")
-check(entry.get("capabilities", {}).get("artifact-port", False), "platform metadata: artifact-port must be declared")
+caps = entry.get("capabilities", {})
+check(set(caps) <= REGISTRY, "platform metadata: unknown capability ID")
+for cap in ("skill-discovery", "skill-metadata", "tool-invocation", "context-port", "artifact-port", "result-port"):
+    check(caps.get(cap) is True, f"platform metadata: required capability {cap} not declared")
+check(caps.get("approval-port") is False, "platform metadata: approval-port should be optional/false")
+check(entry.get("invocation", {}).get("tools") == ["read"], "platform metadata: invocation.tools must expose only read (artifact writes via ContextPort)")
+
+# 4b. Deprecated IDs in current normative files (historical reports excluded)
+deprecated_files = [
+    ROOT / "docs" / "standards" / "skill-standard.md",
+    ROOT / "docs" / "standards" / "skill-metadata-standard.md",
+    ROOT / "docs" / "standards" / "skill-io-contract.md",
+    ROOT / "docs" / "standards" / "skill-security-standard.md",
+    ROOT / "docs" / "standards" / "skill-versioning-standard.md",
+    ROOT / "docs" / "architecture" / "platform-adapter-architecture.md",
+    ROOT / "docs" / "architecture" / "platform-compatibility-matrix.md",
+    ROOT / "docs" / "architecture" / "skill-architecture.md",
+    SKILL / "skill.yaml",
+    ROOT / "platforms" / "openclaw" / "skill-metadata.yaml",
+]
+for path in deprecated_files:
+    txt = path.read_text(encoding="utf-8")
+    check("tool-port" not in txt, f"{path.name}: deprecated capability ID tool-port found")
+
+# 4c. YAML examples in standards must parse and have no duplicate keys
+yaml_blocks = 0
+for path in (ROOT / "docs" / "standards").glob("*.md"):
+    yaml_blocks += check_yaml_blocks(path)
 
 if errors:
     print("REFERENCE SKILL VALIDATION FAILED")
@@ -141,4 +207,5 @@ print("REFERENCE SKILL VALIDATION PASSED")
 print(f"structure=passed schema=Draft202012 examples_in={len(example_inputs)} examples_out={len(example_outputs)}")
 print(f"cases_input_validated={len(case_list)} invalid_cases_rejected={len(invalid_list)}")
 print(f"semver_valid={len(semver_valid)} semver_invalid={len(semver_invalid)}")
+print(f"yaml_blocks_checked={yaml_blocks} registry_ids={len(REGISTRY)}")
 print(f"runtime_behavior=NOT_EXECUTED platform_entries={len(platform.get('skills', {}))}")

@@ -77,8 +77,7 @@ compatibility:
     - tool-invocation
     - context-port
     - artifact-port
-  optional_capabilities:
-    - approval-port
+    - result-port
   optional_capabilities:
     - approval-port
 ```
@@ -167,7 +166,8 @@ dependencies:
   skills: []
   tools: [file-read]
 compatibility:
-  requires_capabilities: [skill-discovery, tool-port, artifact-port]
+  requires_capabilities: [skill-discovery, skill-metadata, tool-invocation, context-port, artifact-port, result-port]
+  optional_capabilities: [approval-port]
 changelog: CHANGELOG.md
 ```
 

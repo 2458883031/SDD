@@ -8,7 +8,7 @@ maintainers:
     id: sdd-p1-reference
 dependencies:
   skills: []
-  tools: [file-read]
+  tools: [file-read]   # Skill-facing Tool; artifact writes use artifact-port/ContextPort
 compatibility:
   requires_capabilities:
     - skill-discovery
@@ -16,6 +16,7 @@ compatibility:
     - tool-invocation
     - context-port
     - artifact-port
+    - result-port
   optional_capabilities:
     - approval-port
 changelog: CHANGELOG.md

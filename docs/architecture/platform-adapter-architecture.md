@@ -63,6 +63,19 @@ Skill、`skill.yaml`、平台元数据和适配器必须使用以下唯一标识
 - 核心 `requires.tools` 表示工具类别，映射到 `tool-invocation`；`requires.permissions` 映射到安全控制，不是 capability。
 - 缺失能力时禁止静默改变核心规则；按上表标记 `not_ready`/`blocked`/降级。
 
+### 2.2 ToolPort 与 ContextPort 的文件写入边界
+
+| 核心声明 | 映射 | 说明 |
+|----------|------|------|
+| `requires.tools: [file-read]` | ToolPort → 平台 `read` | Skill 可见的 ToolPort 能力 |
+| `artifact-port` | ContextPort | Artifact 读写；适配器内部使用平台 `write`，但**不把 write 暴露为 Skill Tool** |
+| `fs:write:project` | 安全控制层 | 权限 scope；与 Artifact 路径限制**同时**生效 |
+
+- `requirements-clarity` 只能通过 `artifact-port`/ContextPort 写入 `artifacts/{task-id}/` 或允许的项目路径；不能直接调用平台 `write`。
+- OpenClaw `write` 是 ContextPort 的内部平台实现，不是该 Skill 的 ToolPort 工具。
+- 平台工具映射不得绕过 `requires.tools`、`requires.permissions`、R0–R4 或 Artifact 路径限制。
+- 如果 Skill 需要通用工作区写入，必须显式声明 `file-write` Tool 和相应权限；本参考 Skill 不声明。
+
 ---
 
 ## 3. 适配器接口

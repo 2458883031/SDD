@@ -78,6 +78,7 @@ compatibility:
     - tool-invocation
     - context-port
     - artifact-port
+    - result-port
   optional_capabilities:
     - approval-port
 changelog: CHANGELOG.md
@@ -178,7 +179,7 @@ skills:
 | `discovery.roots` | 平台 | 平台扫描路径 |
 | `trigger.mode` / `aliases` / `auto_invoke` | 平台 | 平台触发机制映射 |
 | `requirements.bins` / `env` / `config` | 平台 | 平台运行时依赖 |
-| `invocation.mode` / `tools` | 平台 | 平台调用和工具名映射 |
+| `invocation.mode` / `tools` | 平台 | 平台调用和工具名映射；只列 Skill 可见的 ToolPort 工具，ContextPort 内部写工具不列 |
 | `approval.mode` | 平台 | 平台审批交互映射 |
 | `context.base_dir_token` | 平台 | 平台资源根目录占位符 |
 | `limitations` | 平台 | 已知限制和降级说明 |
