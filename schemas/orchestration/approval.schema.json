@@ -31,7 +31,11 @@
     "scope": { "type": "object" },
     "subject_hash": { "type": ["string", "null"] },
     "evidence_refs": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
-    "expires_at": { "type": "string", "format": "date-time" },
+    "expires_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "必须为带时区的合法 ISO 8601；缺失/非法/无时区由校验器 Fail-Closed 拒绝"
+    },
     "single_use": { "const": true },
     "status": {
       "type": "string",

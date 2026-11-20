@@ -75,7 +75,7 @@ Approval 必须绑定：
 
 - Approval Scope 是**完整授权范围**，不是“至少包含”范围。
 - 当前模型采用**规范化后的完整 Scope 精确匹配**（排序后的 JSON 语义）；不采用无约束子集/超集授权。
-- 空 Scope **不表示无限授权**：空 Scope 只能匹配空请求；高风险 SA/G6 必须有非空 Scope。
+- 空 Scope **不表示无限授权**：空 Scope 只能匹配空请求；**所有 `type=sa` 和 `type=both` 的 Approval 必须有非空 Scope**；`type=gate` + `gate=G6` 也必须有非空 Scope；纯操作 Approval 按既有规则。
 - 请求新增参数、资源、路径、目标、扩大参数范围，均视为新范围，必须重新审批。
 - Scope 缩小同样不匹配；如需缩小范围，重新申请并记录新 Scope。
 
@@ -89,10 +89,13 @@ Approval 必须绑定：
 
 ### 2.3 时间与原子消费
 
-- `expires_at`/`now` 使用 ISO 8601 解析，统一转换为 UTC 后比较；支持 `Z` 和时区偏移。
+- `expires_at` 和 `now` **必须存在**，且必须是带时区的合法 ISO 8601 字符串；缺失、null、空字符串、非字符串、非法日期、非法时区、无时区、解析异常均**拒绝**。
+- 使用 `datetime.fromisoformat` 严格解析，统一转换为 UTC；不假设本地时间，不使用系统时间静默兜底。
 - `now >= expires_at` 即视为过期；临界时刻不得使用。
+- 任何 `expires_at`/`now` 校验失败都必须 **Fail-Closed**，不得跳过过期检查继续授权。
 - 消费必须在**原子临界区**内验证：状态、有效期、Task、Workflow、Node、Operation、Target、Environment、Scope、subject_hash。
 - 校验与消费之间不得存在重复消费窗口；并发消费只能一个成功。
+- 任何检查失败都不得修改 Approval 状态、不得写 `consumed_at`/`consumed_by`。
 - 本节的锁/原子性测试只代表静态校验器实现，不代表生产级分布式原子保证。
 
 ---
@@ -230,7 +233,7 @@ APPROVED → EXPIRED / REVOKED / INVALIDATED
 1. 超时/沉默/默认值不等于批准。
 2. Agent 不得自批高风险操作。
 3. Approval 单次使用，绑定 task/operation/target/scope/subject_hash。
-4. Scope 必须规范化后精确匹配；空 Scope 不是无限授权；高风险 SA/G6 必须有非空 Scope。
+4. Scope 必须规范化后精确匹配；空 Scope 不是无限授权；所有 SA/both 和 G6 Approval 必须有非空 Scope。
 5. subject_hash 必须双向绑定；一方缺失/为空而另一方存在时拒绝。
 6. `APPROVED → CONSUMED` 只能成功一次；并发消费只能一个成功。
 7. 过期/失效/已消费的 Approval 不得使用；时间比较统一为 UTC。

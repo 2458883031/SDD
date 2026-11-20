@@ -320,6 +320,19 @@ approval_highrisk_empty_scope["scope"] = {}
 expect_schema_invalid(approval_schema, approval_highrisk_empty_scope,
                       "approval-highrisk-empty-scope", negative)
 
+approval_both_empty_scope = copy.deepcopy(base_approval)
+approval_both_empty_scope["type"] = "both"
+approval_both_empty_scope["scope"] = {}
+expect_schema_invalid(approval_schema, approval_both_empty_scope,
+                      "approval-both-empty-scope", negative)
+
+approval_g6_empty_scope = copy.deepcopy(base_approval)
+approval_g6_empty_scope["type"] = "gate"
+approval_g6_empty_scope["gate"] = "G6"
+approval_g6_empty_scope["scope"] = {}
+expect_schema_invalid(approval_schema, approval_g6_empty_scope,
+                      "approval-g6-empty-scope", negative)
+
 evidence_not_redacted = copy.deepcopy(base_evidence)
 evidence_not_redacted["redacted"] = False
 expect_schema_invalid(evidence_schema, evidence_not_redacted, "evidence-not-redacted", negative)
@@ -1374,6 +1387,7 @@ def scope_matches(approval_scope, requested_scope):
 
 
 def parse_timestamp(value):
+    """Strict ISO 8601 parser: required timezone, UTC conversion, fail closed."""
     if not isinstance(value, str) or not value.strip():
         return None
     text = value.strip()
@@ -1383,9 +1397,13 @@ def parse_timestamp(value):
         dt = datetime.fromisoformat(text)
     except ValueError:
         return None
+    # Missing timezone is invalid; never silently assume UTC/system time.
     if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=timezone.utc)
-    return dt.astimezone(timezone.utc)
+        return None
+    try:
+        return dt.astimezone(timezone.utc)
+    except Exception:
+        return None
 
 
 def approval_usable(approval, ctx):
@@ -1413,10 +1431,13 @@ def approval_usable(approval, ctx):
             return False
 
     expires = parse_timestamp(approval.get("expires_at"))
+    if expires is None:
+        return False
     now = parse_timestamp(ctx.get("now"))
-    if expires is not None:
-        if now is None or now >= expires:
-            return False
+    if now is None:
+        return False
+    if now >= expires:
+        return False
     if approval.get("consumed_at") is not None:
         return False
     return approval.get("single_use") is True
@@ -1539,6 +1560,7 @@ approval_ctx = {
 approval_cases = 0
 scope_cases = 0
 expiry_cases = 0
+time_fail_closed_cases = 0
 
 
 def approval_assert(cond, msg, category=None):
@@ -1660,6 +1682,24 @@ high_risk_empty = copy.deepcopy(approval)
 high_risk_empty["scope"] = {}
 approval_assert(not approval_scope_valid(high_risk_empty),
                 "security: high-risk SA with empty scope must be invalid", "scope")
+sa_empty = copy.deepcopy(approval)
+sa_empty["type"] = "sa"
+sa_empty["gate"] = None
+sa_empty["risk_level"] = "low"
+sa_empty["scope"] = {}
+approval_assert(not approval_scope_valid(sa_empty),
+                "security: SA with empty scope must be invalid", "scope")
+both_empty = copy.deepcopy(approval)
+both_empty["type"] = "both"
+both_empty["scope"] = {}
+approval_assert(not approval_scope_valid(both_empty),
+                "security: both with empty scope must be invalid", "scope")
+g6_empty = copy.deepcopy(approval)
+g6_empty["type"] = "gate"
+g6_empty["gate"] = "G6"
+g6_empty["scope"] = {}
+approval_assert(not approval_scope_valid(g6_empty),
+                "security: G6 with empty scope must be invalid", "scope")
 
 # Expiry: real datetime parsing with timezone offsets and boundary.
 for now_value, expected, label in (
@@ -1689,6 +1729,79 @@ approval_assert(not approval_usable(rejected, approval_ctx),
 # Atomic consumption validates binding/expiry inside the critical section.
 consume_ctx = dict(approval_ctx)
 consume_ctx["now"] = "2026-11-20T11:12:00Z"
+
+# Fail-closed time validation: every invalid expires_at/now must reject via
+# the real ApprovalStore.consume(), leaving APPROVED and no consumption fields.
+invalid_expires = [
+    ("missing", None, True),
+    ("null", None, False),
+    ("empty", "", False),
+    ("non-string", 123, False),
+    ("bad-date", "not-a-date", False),
+    ("no-timezone", "2026-11-20T11:30:00", False),
+    ("bad-timezone", "2026-11-20T11:30:00+99:99", False),
+]
+for label, value, missing in invalid_expires:
+    a = copy.deepcopy(approval)
+    if missing:
+        a.pop("expires_at", None)
+    else:
+        a["expires_at"] = value
+    s = ApprovalStore(a)
+    approval_assert(not s.consume("worker-a", consume_ctx, f"bad-expires-{label}"),
+                    f"security: consume must fail closed for expires_at {label}")
+    approval_assert(s.approval["status"] == "APPROVED",
+                    f"security: invalid expires_at {label} must not change status")
+    approval_assert(s.approval.get("consumed_at") is None,
+                    f"security: invalid expires_at {label} must not set consumed_at")
+    approval_assert(s.approval.get("consumed_by") is None,
+                    f"security: invalid expires_at {label} must not set consumed_by")
+    time_fail_closed_cases += 1
+
+invalid_now = [
+    ("missing", None, True),
+    ("null", None, False),
+    ("empty", "", False),
+    ("non-string", 123, False),
+    ("bad-date", "not-a-date", False),
+    ("no-timezone", "2026-11-20T11:05:00", False),
+    ("bad-timezone", "2026-11-20T11:05:00+99:99", False),
+]
+for label, value, missing in invalid_now:
+    ctx = dict(consume_ctx)
+    if missing:
+        ctx.pop("now", None)
+    else:
+        ctx["now"] = value
+    s = ApprovalStore(approval)
+    approval_assert(not s.consume("worker-a", ctx, f"bad-now-{label}"),
+                    f"security: consume must fail closed for now {label}")
+    approval_assert(s.approval["status"] == "APPROVED",
+                    f"security: invalid now {label} must not change status")
+    approval_assert(s.approval.get("consumed_at") is None,
+                    f"security: invalid now {label} must not set consumed_at")
+    approval_assert(s.approval.get("consumed_by") is None,
+                    f"security: invalid now {label} must not set consumed_by")
+    time_fail_closed_cases += 1
+
+# Boundary and post-failure recovery through the real consume path.
+boundary_ctx = dict(consume_ctx)
+boundary_ctx["now"] = approval.get("expires_at")
+s_boundary = ApprovalStore(approval)
+approval_assert(not s_boundary.consume("worker-a", boundary_ctx, "boundary-ref"),
+                "security: now == expires_at must reject consumption")
+approval_assert(s_boundary.approval["status"] == "APPROVED",
+                "security: boundary rejection must keep APPROVED")
+time_fail_closed_cases += 1
+
+corrected_ctx = dict(consume_ctx)
+corrected_ctx["now"] = "2026-11-20T19:05:00+08:00"
+s_corrected = ApprovalStore(approval)
+approval_assert(s_corrected.consume("worker-a", corrected_ctx, "corrected-ref"),
+                "security: valid offset time must allow consumption after failures")
+approval_assert(s_corrected.approval["status"] == "CONSUMED",
+                "security: corrected valid input must consume successfully")
+
 store = ApprovalStore(approval)
 approval_assert(store.consume("worker-a", consume_ctx, "consume-ref"),
                 "security: valid approval should consume once")
@@ -1841,7 +1954,7 @@ print(f"workflow_graph_positive={graph_positive} workflow_graph_negative={graph_
 print(f"state_transitions_positive={state_positive} state_transitions_negative={state_negative}")
 print(f"transition_definitions={transition_definitions} transition_tests={transition_tests} guard_cases={guard_cases}")
 print(f"parallel_cases={parallel_cases} task_context_cases={task_context_cases} gate_cases={gate_cases}")
-print(f"approval_cases={approval_cases} scope_cases={scope_cases} expiry_cases={expiry_cases} path_cases={path_cases}")
+print(f"approval_cases={approval_cases} scope_cases={scope_cases} expiry_cases={expiry_cases} time_fail_closed_cases={time_fail_closed_cases} path_cases={path_cases}")
 print(f"dag_branch_cases={dag_branch_cases} parallel_join_cases={parallel_join_cases}")
 print(f"failure_cases={failure_cases} security_cases={security_cases}")
 print(f"yaml_blocks_checked={yaml_blocks} registry_ids={len(found_registry)}")
