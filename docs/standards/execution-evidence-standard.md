@@ -25,7 +25,7 @@
 |----|------|--------|----------|--------|----------|
 | User Input | 用户原始请求、约束、偏好 | 用户/交互层 | 任务期间 | 不可变（追加修订需新版本） | 任务参与者只读 |
 | Workflow Context | Workflow ID/版本、运行参数、全局策略、Run 状态 | Orchestrator | 一次 Workflow Run | 由 Orchestrator 受控更新 | Task 只读 |
-| Task Context | task-id、父任务、类型、复杂度、状态、约束、Artifact 引用 | ContextPort/ADR-005 | 任务期间 + 归档 | 仅授权写入者更新状态字段 | 任务参与者按权限读写 |
+| Task Context | task-id、父任务、类型、复杂度、状态、约束、Artifact 引用 | ContextPort/ADR-005 | 任务期间 + 归档 | 仅授权写入者更新状态字段 | 任务参与者按权限读写；根 Context 与 node scoped Context 分离 |
 | Skill Input | 传给 Skill 的结构化输入/Artifact 引用 | Orchestrator/Skill | 单次调用 | 调用后不可变 | Skill 只读 |
 | Skill Output | 统一输出信封、业务输出、Artifact 引用、错误、证据 | Skill | 单次调用 | 不可变（新结果=新版本） | Orchestrator 校验/路由 |
 | Artifact | 需求/设计/代码/测试/审查/部署/报告等产物 | ArtifactManager/ContextPort | 任务期间 + 归档 | 版本化；已批准/完成不可原地改 | 通过引用读取；单写者 |
@@ -34,12 +34,13 @@
 ### 2.1 上下文规则
 
 1. **单一来源**：Task Context 以 ADR-005 为准；不得另建第二套任务状态。
-2. **引用而非复制**：跨 Task/Skill 传递 Artifact 引用（path + version + sha256），不复制内容。
-3. **默认隔离**：不同 task-id 命名空间默认不可互读；跨任务引用必须显式登记。
-4. **最小暴露**：Skill 只获得完成当前节点所需的上下文；不得读取其他任务的私有状态。
-5. **不可变输入**：Skill Input 调用后不可变；需要修改时生成新调用/新版本。
-6. **输出校验**：Skill Output 必须通过 IO Schema/契约校验后才能写入 Artifact。
-7. **凭证隔离**：凭证只以引用形式传递，由有权限的适配器解析；不得进入 Task Context、Artifact 或证据正文。
+2. **根/节点分离**：Workflow Run 根 Task Context 拥有 ADR-005 生命周期；node scoped Context 只记录节点状态，不得写根 `task-status` 为 completed。
+3. **引用而非复制**：跨 Task/Skill 传递 Artifact 引用（path + version + sha256），不复制内容。
+4. **默认隔离**：不同 task-id 命名空间默认不可互读；跨任务引用必须显式登记。
+5. **最小暴露**：Skill 只获得完成当前节点所需的上下文；不得读取其他任务的私有状态。
+6. **不可变输入**：Skill Input 调用后不可变；需要修改时生成新调用/新版本。
+7. **输出校验**：Skill Output 必须通过 IO Schema/契约校验后才能写入 Artifact。
+8. **凭证隔离**：凭证只以引用形式传递，由有权限的适配器解析；不得进入 Task Context、Artifact 或证据正文。
 
 ---
 

@@ -1,0 +1,27 @@
+{
+  "decision_id": "gd-20261120-g6-001",
+  "gate_id": "G6",
+  "task_id": "task-20261120-d4e5f6a7",
+  "workflow_id": "deployment",
+  "node_id": "g6",
+  "required": true,
+  "status": "BLOCKED",
+  "subject_type": "commit",
+  "subject_hash": "5555555555555555555555555555555555555555",
+  "deployment_target": "prod-cluster-cn",
+  "automated_checks": [
+    {
+      "name": "deployment-preflight",
+      "status": "passed",
+      "evidence_ref": "ev-20261120-0008",
+      "details": "部署目标、回滚方案和备份检查通过。"
+    }
+  ],
+  "approval_ref": "ap-20261120-g6-001",
+  "decision_reason": "等待 G6 部署授权与 SA 显式批准；未批准前不得部署。",
+  "decided_by": "system",
+  "decided_at": "2026-11-20T11:05:00Z",
+  "expires_at": null,
+  "evidence_refs": ["ev-20261120-0008"],
+  "invalidation_reason": null
+}

@@ -35,7 +35,8 @@ Task **不是**：
 | `node_id` | 是 | string | 对应 Workflow 节点 |
 | `task_type` | 是 | enum | 任务分类标准中的 9 类 |
 | `status` | 是 | enum | 执行状态：PENDING/READY/RUNNING/WAITING/BLOCKED/SUCCEEDED/FAILED/CANCELLED |
-| `context_status` | 是 | enum | ADR-005 `task-status` 投影 |
+| `context_status` | 是 | enum | ADR-005 `task-status` 投影；node 作用域下仅本地，不代表根完成 |
+| `context_scope` | 是 | enum | `root`（Workflow Run 根 Context）或 `node`（节点级 Task Context） |
 | `complexity` | 是 | enum | L1/L2/L3 |
 | `risk_level` | 是 | enum | low/medium/high/critical |
 | `permission_level` | 是 | enum | R0/R1/R2/R3/R4 |
@@ -60,7 +61,19 @@ Task **不是**：
 
 > 字段必要性：`task_id`/`run_id`/`workflow_id`/`node_id` 用于定位与审计；`status`/`context_status` 分离调度状态与 ADR-005 生命周期；`inputs`/`outputs`/`dependencies` 保证可重放；`retry_policy`/`timeout_policy`/`idempotency_key` 保证失败恢复可控；`evidence_refs` 保证可追溯。
 
-### 2.2 Task Context 字段
+### 2.2 根 Context 与节点 Context
+
+P1-002 将 Task 定义为 Workflow 节点级可调度单元，而 ADR-005 的 `task-status` 描述整个 Task Context 生命周期。两者关系明确如下（**不修改 ADR-005**）：
+
+1. **Workflow Run 拥有独立的根 Task Context。** 根 Task Context 的 `task_id` 是 Run 的根任务 ID，`task-status` 按 ADR-005 的 `created → planned → executing → verifying → completed/failed/aborted` 演进。
+2. **节点级 Task 拥有独立的 scoped Task Context。** 每个节点 Task 的 `parent_task_id` 指向根任务 ID；节点 Context 只保存该节点的输入/输出/执行状态，不拥有 Run 的全局完成权。
+3. **节点 Task SUCCEEDED 不得把根 Task Context 设置为 completed。** 节点完成只更新节点 `status`/本地 `context_status`；根 `task-status` 仍为 `executing`（或 `verifying`）。
+4. **只有 Workflow 级验证完成后，根 Task Context 才能进入 `completed`。** 必需 Task 成功/允许跳过、必需 Gate 通过、Workflow 验证完成后，根 Context 才能 `verifying → completed`。
+5. **映射规则：**
+   - `context_scope=root`：`context_status` 是权威 ADR-005 生命周期，`status` 是调度投影。
+   - `context_scope=node`：`status` 是节点执行状态；`context_status` 只是节点本地投影，不得写入根 Context。
+   - 节点 `SUCCEEDED` 对应节点本地 `completed`，但不改变根 `task-status`。
+   - 根 `completed` 只能由 Workflow 验证器/Orchestrator 在 Workflow 级验证通过后写入。
 
 Task Context 仍按 ADR-005 保存：
 
@@ -69,7 +82,7 @@ Task Context 仍按 ADR-005 保存：
 - `user-preferences`、`platform-config`（引用）、`task-constraints`；
 - `artifact-references`（path/version/sha256/required）。
 
-Task 模型中的 `status` 是执行状态，不得覆盖 ADR-005 的 `task-status`；`context_status` 必须与 ADR-005 同步。
+Task 模型中的 `status` 是执行状态，不得覆盖 ADR-005 的 `task-status`；根 Context 的 `context_status` 必须与 ADR-005 同步，节点 Context 的 `context_status` 只是本地投影。
 
 ---
 
@@ -265,8 +278,10 @@ Task 进入 `SUCCEEDED` 必须同时满足：
 6. 同一路径不得并发多写。
 7. 失败不得标记为成功。
 8. 取消后不得继续执行。
-9. 审批过期/失效后不得继续使用。
+9. 审批过期/失效/已消费后不得继续使用。
 10. Task 执行状态与 ADR-005 `task-status` 必须按映射同步。
+11. 节点 Task SUCCEEDED 不得把根 Task Context 设置为 completed。
+12. 根 Task Context 只有在 Workflow 级验证完成后才能 completed。
 
 ---
 

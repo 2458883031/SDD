@@ -17,10 +17,14 @@ policies:
 nodes:
   - id: feature
     type: subworkflow
-    workflow_ref: feature-development
+    workflow_ref:
+      id: feature-development
+      version: "0.1.0"
   - id: deploy
     type: subworkflow
-    workflow_ref: deployment
+    workflow_ref:
+      id: deployment
+      version: "0.1.0"
     depends_on: [feature]
   - id: end
     type: end

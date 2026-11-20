@@ -27,5 +27,8 @@
   "status": "APPROVED",
   "decided_by": "human:alice",
   "decided_at": "2026-11-20T11:10:00Z",
-  "decision_reason": "部署目标、回滚方案和证据已审核；批准单次生产部署。"
+  "decision_reason": "部署目标、回滚方案和证据已审核；批准单次生产部署。",
+  "consumed_at": null,
+  "consumed_by": null,
+  "consumption_ref": null
 }

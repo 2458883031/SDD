@@ -2,8 +2,8 @@
   "schema_version": 1,
   "name": "approval",
   "initial": "REQUESTED",
-  "states": ["REQUESTED", "PENDING", "APPROVED", "REJECTED", "EXPIRED", "REVOKED", "INVALIDATED"],
-  "terminal": ["REJECTED", "EXPIRED", "REVOKED", "INVALIDATED"],
+  "states": ["REQUESTED", "PENDING", "APPROVED", "CONSUMED", "REJECTED", "EXPIRED", "REVOKED", "INVALIDATED"],
+  "terminal": ["CONSUMED", "REJECTED", "EXPIRED", "REVOKED", "INVALIDATED"],
   "transitions": [
     { "from": "REQUESTED", "to": "PENDING", "guard": "request_delivered_to_approver" },
     { "from": "PENDING", "to": "APPROVED", "guard": "explicit_human_approval_and_binding_valid" },
@@ -11,6 +11,7 @@
     { "from": "PENDING", "to": "EXPIRED", "guard": "approval_timeout" },
     { "from": "PENDING", "to": "REVOKED", "guard": "request_or_approval_revoked" },
     { "from": "PENDING", "to": "INVALIDATED", "guard": "task_operation_target_scope_or_subject_changed" },
+    { "from": "APPROVED", "to": "CONSUMED", "guard": "single_use_atomic_consume_and_binding_valid" },
     { "from": "APPROVED", "to": "EXPIRED", "guard": "approval_timeout" },
     { "from": "APPROVED", "to": "REVOKED", "guard": "approval_revoked_before_use" },
     { "from": "APPROVED", "to": "INVALIDATED", "guard": "task_operation_target_scope_or_subject_changed" }
@@ -18,6 +19,7 @@
   "invariants": [
     "no_transition_from_terminal",
     "approval_is_single_use",
+    "approved_may_transition_to_consumed_only_once",
     "timeout_silence_or_default_never_means_approved",
     "agent_cannot_self_approve_high_risk",
     "approval_cannot_be_reused_across_tasks_operations_or_artifacts"

@@ -504,7 +504,9 @@ builder_check:
 P1-002 引入的 Task Execution State（PENDING/READY/RUNNING/WAITING/BLOCKED/SUCCEEDED/FAILED/CANCELLED）是调度器的工作状态，不是对 ADR-005 `task-status` 的替代：
 
 - ADR-005 仍是 Task Context 持久化生命周期和终止状态的权威定义。
+- Workflow Run 拥有独立的根 Task Context；节点级 Task 拥有 scoped Context，`parent_task_id` 指向根任务。
 - Task 模型同时记录 `status`（执行状态）和 `context_status`（ADR-005 投影）。
+- 节点 Task SUCCEEDED 不得把根 Task Context 设置为 completed；根 completed 只在 Workflow 级验证完成后写入。
 - 两者映射和同步规则见 [orchestration-state-machine.md](../standards/orchestration-state-machine.md)。
 - 不新增或修改 ADR-005 的 `created/planned/executing/awaiting_approval/verifying/completed/failed/aborted` 语义。
 

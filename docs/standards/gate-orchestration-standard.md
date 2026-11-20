@@ -29,7 +29,8 @@
 | `required` | 是 | 是否必需；N/A 时为 false |
 | `status` | 是 | NOT_REQUIRED/PENDING/EVALUATING/PASSED/FAILED/BLOCKED/INVALIDATED/EXPIRED |
 | `subject_type` | 是 | commit/artifact/task/other |
-| `subject_hash` | 条件 | commit SHA 或产物 hash；G4/G5 必需 |
+| `subject_hash` | 条件 | commit SHA 或产物 hash；G4/G5 在所有状态下必需；G6 必需 |
+| `deployment_target` | 条件 | G6 必需；生产部署目标/环境对象 |
 | `automated_checks` | 是 | 检查项、结果、证据引用 |
 | `approval_ref` | 否 | 关联 Approval ID（如需人工审批） |
 | `decision_reason` | 是 | 通过/失败/阻塞原因 |
@@ -40,6 +41,8 @@
 | `invalidation_reason` | 否 | 失效原因 |
 
 - GateDecision 不可原地修改；重新评估创建新 `decision_id`。
+- G4/G5 在 PENDING/EVALUATING/BLOCKED/PASSED/FAILED 等所有状态下都必须绑定有效 `subject_hash`，不得用 null/缺失绕过。
+- G6 必须绑定有效部署对象（`deployment_target`）和 `subject_hash`；生产部署前不得为空。
 - 状态转换见 [orchestration-state-machine.md](./orchestration-state-machine.md)。
 
 ---
@@ -168,16 +171,17 @@ Builder Check 是 G2 的独立审查环节（ADR-006 §12）：
 
 ## 8. 不变量
 
-1. G4/G5 必须同一 subject hash；新版本使旧结果失效。
-2. 质量门禁必须 G4 AND G5，不得用 Task SUCCEEDED 代替。
-3. 生产部署必须 R3 + G6 + SA；缺一不可。
-4. 非生产部署不得触发 G6。
-5. G6 不得自动批准；R4 不等于 G6；SA 不替代权限检查。
-6. Gate 失败不得进入下一阶段。
-7. N/A 必须记录理由，不得静默跳过。
-8. 审批过期/失效后不得使用。
-9. GateDecision 不可原地修改。
-10. 超时/沉默不等于批准。
+1. G4/G5 在所有状态下必须绑定有效 subject_hash；G6 必须绑定 subject_hash + deployment_target。
+2. G4/G5 必须同一 subject hash；新版本使旧结果失效。
+3. 质量门禁必须 G4 AND G5，不得用 Task SUCCEEDED 代替。
+4. 生产部署必须 R3 + G6 + SA；缺一不可。
+5. 非生产部署不得触发 G6。
+6. G6 不得自动批准；R4 不等于 G6；SA 不替代权限检查。
+7. Gate 失败不得进入下一阶段。
+8. N/A 必须记录理由，不得静默跳过。
+9. 审批过期/失效/已消费后不得使用。
+10. GateDecision 不可原地修改。
+11. 超时/沉默不等于批准。
 
 ---
 

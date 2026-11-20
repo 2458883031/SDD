@@ -1,0 +1,53 @@
+{
+  "schema_version": 1,
+  "task_id": "task-20261120-root0001",
+  "parent_task_id": null,
+  "run_id": "run-20261120-0001",
+  "workflow_id": "feature-development",
+  "workflow_version": "0.1.0",
+  "node_id": "workflow_root",
+  "task_type": "feature_development",
+  "status": "RUNNING",
+  "context_status": "executing",
+  "context_scope": "root",
+  "complexity": "L2",
+  "risk_level": "medium",
+  "permission_level": "R1",
+  "inputs": [],
+  "outputs": [],
+  "dependencies": [],
+  "assigned_agent": { "id": "orchestrator-main", "role": "orchestrator" },
+  "assigned_skill": null,
+  "retry_policy": {
+    "max_attempts": 1,
+    "backoff": "fixed",
+    "initial_delay_seconds": 0,
+    "max_delay_seconds": 0,
+    "jitter": false,
+    "retry_budget_seconds": 0,
+    "retry_on": [],
+    "non_retryable": ["irreversible"]
+  },
+  "timeout_policy": {
+    "timeout_seconds": 7200,
+    "on_timeout": "block",
+    "heartbeat_seconds": 60
+  },
+  "approval_requirement": null,
+  "evidence_refs": ["ev-20261120-root-0001"],
+  "idempotency_key": "run-20261120-0001/root",
+  "subject_hash": null,
+  "attempt": 1,
+  "lease": {
+    "owner": "orchestrator-main",
+    "expires_at": "2026-11-20T12:00:00Z"
+  },
+  "error": null,
+  "created_at": "2026-11-20T10:00:00Z",
+  "started_at": "2026-11-20T10:00:00Z",
+  "completed_at": null,
+  "metadata": {
+    "root_task_context": true,
+    "workflow_run_id": "run-20261120-0001"
+  }
+}

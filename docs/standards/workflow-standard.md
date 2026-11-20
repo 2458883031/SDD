@@ -49,7 +49,7 @@ Workflow 由 Orchestrator 解释和执行；节点通过 `depends_on` 组织 DAG
 | `name` / `description` | 否 | 可读说明 |
 | `skill` | 条件 | `type=skill` 时必需；引用 Skill 名称 |
 | `tool` | 条件 | `type=tool` 时必需；引用已授权 Tool 类别 |
-| `workflow_ref` | 条件 | `type=subworkflow` 时必需；引用已发布 Workflow |
+| `workflow_ref` | 条件 | `type=subworkflow` 时必需；`{id, version}`，version 必须是固定 SemVer |
 | `gate` / `gates` | 条件 | `type=gate` 时至少一个；G1–G6 |
 | `approval` | 否 | `type=approval` 或需要 SA 的节点 |
 | `depends_on` | 否 | 前置节点 ID；空表示入口 |
@@ -76,7 +76,7 @@ Workflow 由 Orchestrator 解释和执行；节点通过 `depends_on` 组织 DAG
 | `parallel` | 显式分叉/汇合 | 必须有 `depends_on`/后继；汇合策略明确 |
 | `check` | 健康检查/冒烟/验收检查 | 不产生业务结论；失败按失败路径 |
 | `end` | 终止节点 | 不得有出边 |
-| `subworkflow` | 组合另一个 Workflow | `workflow_ref` 必须存在；禁止递归/循环；深度 ≤3 |
+| `subworkflow` | 组合另一个 Workflow | `workflow_ref` 必须含固定 `id` + SemVer `version`；被引用 Workflow 必须 `tested`/`published`；禁止递归/循环；深度 ≤3 |
 | `approval` | 显式 SA/权限审批 | 只用于 G1–G6 之外的显式安全授权；不得替代 Gate |
 
 > `subworkflow` 与 `approval` 是 P1-002 的**新增节点类型**，用于组合和显式授权；不改变 P0 既有节点语义。
@@ -247,9 +247,10 @@ Workflow 由 Orchestrator 解释和执行；节点通过 `depends_on` 组织 DAG
 
 ### 6.3 组合
 
-- 通过 `subworkflow` 引用已发布 Workflow。
+- 通过 `subworkflow` 引用已发布/已验证 Workflow，引用必须写固定 `id` + SemVer `version`；不得使用 `latest` 或范围版本。
+- 被引用 Workflow 必须存在且 `status` 为 `tested` 或 `published`；`draft`/`review` 不得被执行组合。
 - 组合必须保持子 Workflow 的 Gate 和证据要求。
-- 组合深度 ≤3；禁止递归和循环。
+- 组合深度 ≤3；禁止直接或间接递归/循环。
 - 子 Workflow 的输入/输出必须映射到父 Workflow 的 Artifact 引用。
 - 组合后的 Workflow 仍需通过自身 DAG 校验。
 - 示例：`release-composed` 通过 `subworkflow` 组合 `feature-development` 与 `deployment`，文件为 `examples/orchestration/workflows/release-composed.yaml`。
@@ -370,7 +371,8 @@ PENDING → RUNNING → SUCCEEDED
 
 1. 依赖未满足的节点不得执行。
 2. DAG 不得有循环。
-3. G4/G5 必须同一 subject hash；新版本使旧结果失效。
+3. Subworkflow 必须固定 `id` + SemVer，禁止递归，组合深度 ≤3。
+4. G4/G5 必须同一 subject hash；新版本使旧结果失效。
 4. 质量门禁必须 G4 AND G5；不得用 Task SUCCEEDED 代替。
 5. 生产部署必须 G6 + R3 + SA。
 6. 非生产部署不得触发 G6。

@@ -3,7 +3,7 @@ id: feature-development
 version: "0.1.0"
 name: 功能开发
 description: 完整功能开发流程；G4 与 G5 并行且绑定同一 commit/产物 hash；生产部署时另行触发 G6。
-status: draft
+status: tested
 trigger:
   task_types: [feature_development]
   complexity: [L2, L3]

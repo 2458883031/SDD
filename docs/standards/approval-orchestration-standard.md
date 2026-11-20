@@ -48,10 +48,13 @@
 | `evidence_refs` | 是 | 支持审批的证据 |
 | `expires_at` | 是 | 过期时间；不得无限期 |
 | `single_use` | 是 | 必须为 true |
-| `status` | 是 | REQUESTED/PENDING/APPROVED/REJECTED/EXPIRED/REVOKED/INVALIDATED |
+| `status` | 是 | REQUESTED/PENDING/APPROVED/CONSUMED/REJECTED/EXPIRED/REVOKED/INVALIDATED |
 | `decided_by` | 否 | 授权人/策略控制者 |
 | `decided_at` | 否 | 决定时间 |
 | `decision_reason` | 否 | 批准/拒绝原因 |
+| `consumed_at` | 条件 | 消费时间；`status=CONSUMED` 时必需 |
+| `consumed_by` | 条件 | 消费执行者；`status=CONSUMED` 时必需 |
+| `consumption_ref` | 否 | 消费对应的执行/证据引用 |
 
 ### 2.1 绑定要求
 
@@ -89,7 +92,7 @@ Approval 必须绑定：
 ## 4. 生命周期
 
 ```text
-REQUESTED → PENDING → APPROVED
+REQUESTED → PENDING → APPROVED ──→ CONSUMED
                     ├── REJECTED
                     ├── EXPIRED
                     ├── REVOKED
@@ -101,12 +104,16 @@ APPROVED → EXPIRED / REVOKED / INVALIDATED
 |------|------|------------------|
 | REQUESTED | 已创建，尚未送达 | 否 |
 | PENDING | 等待授权人决定 | 否 |
-| APPROVED | 显式批准，绑定有效 | 是（仅绑定范围/有效期） |
+| APPROVED | 显式批准，绑定有效 | 是（仅绑定范围/有效期，且未消费） |
+| CONSUMED | 已单次消费（终态） | 否 |
 | REJECTED | 显式拒绝（终态） | 否 |
 | EXPIRED | 超过有效期（终态） | 否 |
 | REVOKED | 使用前被撤销（终态） | 否 |
 | INVALIDATED | 任务/操作/产物/scope 变化（终态） | 否 |
 
+- `APPROVED → CONSUMED` 必须通过原子 compare-and-set 完成；同一 Approval 只能成功消费一次。
+- 并发消费只能有一个成功；其余必须返回 `already_consumed`，不得重复执行副作用。
+- `CONSUMED` 是终态，不得恢复为 `APPROVED`。
 - `APPROVED` 不是永久状态；使用前必须再次校验任务、scope、subject hash 和有效期。
 - 状态转换详见 [orchestration-state-machine.md](./orchestration-state-machine.md)。
 
@@ -148,12 +155,13 @@ APPROVED → EXPIRED / REVOKED / INVALIDATED
 
 ## 7. 防复用与防自批
 
-1. Approval 单次使用；使用后标记已消费，不得再次使用。
-2. 不得跨 Task、跨操作、跨目标、跨产物复用。
-3. 不得把 G6 批准用于非部署操作；不得把 SA 当作 G6。
-4. 不得把权限 lease 当作审批；不得把审批当作权限提升。
-5. Agent 不得批准自己的高风险操作；不得由同一执行者自审。
-6. 批量/通配审批禁止；每次高风险操作单独授权。
+1. Approval 单次使用；消费时必须以原子操作从 `APPROVED` 转为 `CONSUMED`，并记录 `consumed_at`、`consumed_by`、`consumption_ref`。
+2. 同一 Approval 的并发消费只能有一个成功；其他请求返回 `already_consumed`，不得重复执行副作用。
+3. 不得跨 Task、跨操作、跨目标、跨产物复用。
+4. 不得把 G6 批准用于非部署操作；不得把 SA 当作 G6。
+5. 不得把权限 lease 当作审批；不得把审批当作权限提升。
+6. Agent 不得批准自己的高风险操作；不得由同一执行者自审。
+7. 批量/通配审批禁止；每次高风险操作单独授权。
 
 ---
 
@@ -166,7 +174,7 @@ APPROVED → EXPIRED / REVOKED / INVALIDATED
 - 请求者、批准者、时间、决定、原因；
 - 绑定 scope、subject_hash、有效期；
 - 证据引用；
-- 使用时间、使用结果、是否消费；
+- 使用时间、使用结果、是否消费、`consumed_at`/`consumed_by`/`consumption_ref`；
 - 失效/撤销原因。
 
 审计追加写入、脱敏、不可静默修改。
@@ -196,13 +204,13 @@ APPROVED → EXPIRED / REVOKED / INVALIDATED
 1. 超时/沉默/默认值不等于批准。
 2. Agent 不得自批高风险操作。
 3. Approval 单次使用，绑定 task/operation/target/scope/subject_hash。
-4. 过期/失效的 Approval 不得使用。
-5. 拒绝后不得绕过。
-6. 未批准时高风险操作必须 BLOCKED。
-7. 审批不授予权限，不替代 R0–R4 检查。
-8. G6 仅生产部署触发；非生产部署不得要求 G6。
-9. 审批记录追加写入、脱敏。
-10. 不得批量/通配批准高风险操作。
+4. `APPROVED → CONSUMED` 只能成功一次；并发消费只能一个成功。
+5. 过期/失效/已消费的 Approval 不得使用。
+6. 拒绝后不得绕过。
+7. 未批准时高风险操作必须 BLOCKED。
+8. 审批不授予权限，不替代 R0–R4 检查。
+9. G6 仅生产部署触发；非生产部署不得要求 G6。
+10. 审批记录追加写入、脱敏；不得批量/通配批准高风险操作。
 
 ---
 

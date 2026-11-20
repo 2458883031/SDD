@@ -35,11 +35,14 @@
     "single_use": { "const": true },
     "status": {
       "type": "string",
-      "enum": ["REQUESTED", "PENDING", "APPROVED", "REJECTED", "EXPIRED", "REVOKED", "INVALIDATED"]
+      "enum": ["REQUESTED", "PENDING", "APPROVED", "CONSUMED", "REJECTED", "EXPIRED", "REVOKED", "INVALIDATED"]
     },
     "decided_by": { "type": ["string", "null"] },
     "decided_at": { "type": ["string", "null"], "format": "date-time" },
-    "decision_reason": { "type": ["string", "null"] }
+    "decision_reason": { "type": ["string", "null"] },
+    "consumed_at": { "type": ["string", "null"], "format": "date-time" },
+    "consumed_by": { "type": ["string", "null"] },
+    "consumption_ref": { "type": ["string", "null"] }
   },
   "allOf": [
     {
@@ -71,6 +74,16 @@
       "then": {
         "properties": { "subject_hash": { "type": "string", "minLength": 1 } },
         "required": ["subject_hash"]
+      }
+    },
+    {
+      "if": { "properties": { "status": { "const": "CONSUMED" } }, "required": ["status"] },
+      "then": {
+        "properties": {
+          "consumed_at": { "type": "string", "format": "date-time" },
+          "consumed_by": { "type": "string", "minLength": 1 }
+        },
+        "required": ["consumed_at", "consumed_by"]
       }
     }
   ],

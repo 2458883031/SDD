@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "task_id": "task-20261120-e5f6a7b8",
-  "parent_task_id": null,
+  "parent_task_id": "task-20261120-root0002",
   "run_id": "run-20261120-0002",
   "workflow_id": "bug-fix",
   "workflow_version": "0.1.0",
@@ -9,6 +9,7 @@
   "task_type": "bug_fix",
   "status": "FAILED",
   "context_status": "failed",
+  "context_scope": "node",
   "complexity": "L2",
   "risk_level": "medium",
   "permission_level": "R2",

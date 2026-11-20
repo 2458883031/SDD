@@ -3,7 +3,7 @@ id: deployment
 version: "0.1.0"
 name: 生产部署
 description: 生产部署流程；必须 G6 + R3 + SA，部署后验证不等于 G6。
-status: draft
+status: tested
 trigger:
   task_types: [deployment_task]
   complexity: [L2, L3]

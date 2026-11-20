@@ -7,7 +7,7 @@
   "additionalProperties": false,
   "required": [
     "schema_version", "task_id", "run_id", "workflow_id", "workflow_version",
-    "node_id", "task_type", "status", "context_status", "complexity",
+    "node_id", "task_type", "status", "context_status", "context_scope", "complexity",
     "risk_level", "permission_level", "inputs", "outputs", "dependencies",
     "retry_policy", "timeout_policy", "evidence_refs", "idempotency_key",
     "attempt", "created_at"
@@ -38,6 +38,11 @@
     "context_status": {
       "type": "string",
       "enum": ["created", "planned", "executing", "awaiting_approval", "verifying", "completed", "failed", "aborted"]
+    },
+    "context_scope": {
+      "type": "string",
+      "enum": ["root", "node"],
+      "description": "root = Workflow Run 根 Task Context；node = 节点级 Task Context，不得直接设置根 completed"
     },
     "complexity": { "type": "string", "enum": ["L1", "L2", "L3"] },
     "risk_level": { "type": "string", "enum": ["low", "medium", "high", "critical"] },

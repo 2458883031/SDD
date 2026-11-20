@@ -17,7 +17,8 @@ P1-002 区分以下状态，不得混用：
 | Node State | WorkflowRunner | Workflow 节点 | 是（事件） |
 | Gate State | GateCoordinator | 单次 Gate 决定 | 是（GateDecision） |
 | Approval State | ApprovalCoordinator + 授权人 | 单次审批 | 是（Approval） |
-| ADR-005 `task-status` | ContextPort | Task Context 生命周期 | 是（context.json） |
+| Root Task Context `task-status` | ContextPort/Orchestrator | 整个 Workflow Run 生命周期 | 是（context.json） |
+| Node Task Context（本地投影） | Orchestrator/StateStore | 单个节点 Task | 是（不写根状态） |
 
 **规则：**
 
@@ -91,7 +92,17 @@ P1-002 区分以下状态，不得混用：
 | FAILED | `failed` | 不可恢复失败 |
 | CANCELLED | `aborted` | 取消/拒绝/策略终止 |
 
+> 该表用于 `context_scope=root` 的根 Task Context。`context_scope=node` 的 `context_status` 只是本地投影；节点 SUCCEEDED 不得把根 `task-status` 写成 `completed`。
+
 > ADR-005 的 `verifying` 阶段对应 Workflow 级验证；Task 级 `SUCCEEDED` 不等于整个 Workflow `completed`。
+
+### 2.4 根 Context 完成规则
+
+1. Workflow Run 拥有独立的根 Task Context；根 `task-status` 按 ADR-005 生命周期演进。
+2. 节点级 Task 拥有 scoped Context，`parent_task_id` 指向根任务；节点 Context 不拥有 Run 的全局完成权。
+3. 节点 Task 进入 `SUCCEEDED` 只更新节点本地状态和本地 `context_status`，不得把根 `task-status` 写成 `completed`。
+4. 根 Context 只有在所有必需 Task 成功/允许跳过、必需 Gate 通过、Workflow 级验证完成后，才能从 `verifying` 进入 `completed`。
+5. `context_scope=root` 的 `context_status` 是权威生命周期；`context_scope=node` 的 `context_status` 只是本地投影。
 
 ---
 
@@ -240,7 +251,7 @@ Approval 对象字段与绑定规则见 [approval-orchestration-standard.md](./a
 
 ### 6.2 状态
 
-`REQUESTED`、`PENDING`、`APPROVED`、`REJECTED`、`EXPIRED`、`REVOKED`、`INVALIDATED`。
+`REQUESTED`、`PENDING`、`APPROVED`、`CONSUMED`、`REJECTED`、`EXPIRED`、`REVOKED`、`INVALIDATED`。
 
 ### 6.3 合法转换
 
@@ -252,14 +263,16 @@ Approval 对象字段与绑定规则见 [approval-orchestration-standard.md](./a
 | PENDING | EXPIRED | 超过有效期 |
 | PENDING | REVOKED | 请求方/授权人撤销 |
 | PENDING | INVALIDATED | 任务/操作/产物/scope 变化 |
+| APPROVED | CONSUMED | 原子单次消费成功；绑定仍有效 |
 | APPROVED | INVALIDATED | 使用前 subject/scope 变化 |
 | APPROVED | EXPIRED | 超过有效期 |
 | APPROVED | REVOKED | 授权人撤销（使用前） |
-| REJECTED / EXPIRED / REVOKED / INVALIDATED | — | 终态；不得复用 |
+| CONSUMED / REJECTED / EXPIRED / REVOKED / INVALIDATED | — | 终态；不得复用 |
 
 **规则：**
 
 - Approval 单次使用；批准后只能用于绑定的 task/operation/target/subject_hash。
+- `APPROVED → CONSUMED` 必须原子完成；并发消费只能一个成功，其余返回 `already_consumed`。
 - 任务变更、产物 hash 变化、scope 变化 → 立即 INVALIDATED。
 - 超时、沉默、默认值不等于批准。
 - Agent 不得批准自己的高风险操作。
@@ -274,11 +287,12 @@ Approval 对象字段与绑定规则见 [approval-orchestration-standard.md](./a
 3. Workflow 进入 SUCCEEDED 必须所有必需 Task 成功/允许跳过，且必需 Gate PASSED。
 4. Gate PASSED 必须有完整自动检查和所需审批；G4/G5 同一 subject hash。
 5. G6 不得自动批准；生产部署必须 R3 + G6 + SA。
-6. Approval 不得跨 Task/操作/产物复用。
+6. Approval 不得跨 Task/操作/产物复用；消费后必须为 CONSUMED。
 7. Task Execution State 与 ADR-005 `task-status` 必须按映射同步。
-8. 状态变更必须记录事件（from/to/reason/actor/timestamp）。
-9. 取消后不得继续执行；取消是终态。
-10. 不得用 Task SUCCEEDED 替代 GateDecision。
+8. 节点 Task SUCCEEDED 不得把根 Task Context 设置为 completed；根 completed 只在 Workflow 验证完成后写入。
+9. 状态变更必须记录事件（from/to/reason/actor/timestamp）。
+10. 取消后不得继续执行；取消是终态。
+11. 不得用 Task SUCCEEDED 替代 GateDecision。
 
 ---
 

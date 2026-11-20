@@ -23,6 +23,7 @@
     },
     "subject_type": { "type": "string", "enum": ["commit", "artifact", "task", "other"] },
     "subject_hash": { "type": ["string", "null"] },
+    "deployment_target": { "type": ["string", "null"] },
     "automated_checks": {
       "type": "array",
       "items": { "$ref": "#/$defs/automatedCheck" }
@@ -48,9 +49,20 @@
       }
     },
     {
+      "if": { "properties": { "gate_id": { "enum": ["G4", "G5"] } }, "required": ["gate_id"] },
+      "then": {
+        "properties": { "subject_hash": { "type": "string", "minLength": 8 } },
+        "required": ["subject_hash"]
+      }
+    },
+    {
       "if": { "properties": { "gate_id": { "const": "G6" } }, "required": ["gate_id"] },
       "then": {
-        "required": ["subject_hash"]
+        "properties": {
+          "subject_hash": { "type": "string", "minLength": 8 },
+          "deployment_target": { "type": "string", "minLength": 1 }
+        },
+        "required": ["subject_hash", "deployment_target"]
       }
     }
   ],

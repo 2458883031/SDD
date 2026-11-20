@@ -130,7 +130,8 @@ PENDING → RUNNING → SUCCEEDED
 |------|------------|--------------|
 | Workflow Run 执行状态 | Orchestrator / StateStore | 只读；通过事件订阅 |
 | Task 执行状态 | Orchestrator / StateStore | 只读；TaskExecutor 只能报告结果 |
-| Task Context 生命周期 | ADR-005 / ContextPort | 只有授权写入者更新；其他只读 |
+| 根 Task Context `task-status` | ADR-005 / ContextPort | 只有 Workflow 级验证完成后才能 `completed` |
+| 节点 Task Context（本地投影） | Orchestrator / StateStore | 只写本节点；不得写根 `task-status` |
 | Artifact 版本/hash | ArtifactManager / ContextPort | 只读引用；写入需单写者租约 |
 | Gate 决定 | GateCoordinator | 只读；不得改写历史决定 |
 | Approval 决定 | 授权人类/策略控制者 + ApprovalCoordinator 记录 | Orchestrator 只读决定，不代替批准 |
@@ -139,7 +140,8 @@ PENDING → RUNNING → SUCCEEDED
 
 **规则：**
 
-- Task 执行状态与 ADR-005 `task-status` 不是同一字段；映射见状态机标准。
+- Task 执行状态与 ADR-005 `task-status` 不是同一字段；根 Task Context 使用 ADR-005 生命周期，节点 Task 的 `context_status` 只是本地投影，映射见状态机标准。
+- 节点 Task 进入 SUCCEEDED 不得把根 Task Context 设置为 completed；根 completed 只在 Workflow 级验证完成后写入。
 - 任何组件不得直接写其他组件的状态；必须通过事件/接口。
 - 状态变更必须记录 `event_id`、`task_id`、`from`、`to`、`reason`、`timestamp`、`actor`。
 
@@ -181,12 +183,14 @@ PENDING → RUNNING → SUCCEEDED
 2. 没有有效输出和证据的 Task 不得进入 SUCCEEDED。
 3. 没有同一 subject hash 的 G4 AND G5 不得通过质量门禁。
 4. 生产部署未满足 R3 + G6 + SA 不得执行。
-5. 审批不得跨 Task、跨操作或跨产物复用。
+5. 审批不得跨 Task、跨操作或跨产物复用；`APPROVED → CONSUMED` 只能成功一次。
 6. 终态 Task/Workflow 不得直接恢复执行。
 7. 同一 Artifact 路径不得并发多写。
 8. 同一幂等键不得并发创建两个执行实例。
 9. Gate 失败不得被下游节点“猜测修复”或静默跳过。
 10. 执行证据不得包含原始凭证。
+11. 节点 Task SUCCEEDED 不得把根 Task Context 设置为 completed。
+12. 根 Task Context 只有在 Workflow 级验证完成后才能 completed。
 
 ---
 
