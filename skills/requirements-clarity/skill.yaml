@@ -1,0 +1,19 @@
+schema_version: 1
+name: requirements-clarity
+version: 0.1.0
+status: draft
+license: MIT
+maintainers:
+  - role: owner
+    id: sdd-p1-reference
+dependencies:
+  skills: []
+  tools: [file-read]
+compatibility:
+  requires_capabilities:
+    - skill-discovery
+    - tool-port
+    - artifact-port
+  optional_capabilities:
+    - approval-port
+changelog: CHANGELOG.md

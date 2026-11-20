@@ -302,5 +302,40 @@ steps:
 - [x] 通用 Skill 规范与平台元数据分离（P0-002）
 - [x] 结构规范定义
 - [x] CLI 示例状态标注
-- [ ] 模板文件创建（P1）
+- [x] P1-001 规范落地（见第 11 节）
+- [ ] 模板文件与批量 Skill（P1 后续）
 - [ ] 平台适配验证（P7）
+
+## 11. P1-001 规范落地
+
+P1-001 在保留 P0 架构关系的前提下，把 Skill 规范拆成可执行的标准文件：
+
+| 主题 | 权威文档 |
+|------|----------|
+| Skill 定义、边界、目录、SKILL.md 正文 | [skill-standard.md](../standards/skill-standard.md) |
+| 核心/通用/平台元数据分层 | [skill-metadata-standard.md](../standards/skill-metadata-standard.md) |
+| 输入输出与 JSON Schema | [skill-io-contract.md](../standards/skill-io-contract.md) |
+| 权限、Tool、SA/G6 | [skill-security-standard.md](../standards/skill-security-standard.md) |
+| 版本、依赖、生命周期 | [skill-versioning-standard.md](../standards/skill-versioning-standard.md) |
+| 平台适配接口 | [platform-adapter-architecture.md](./platform-adapter-architecture.md) |
+| 六平台证据矩阵 | [platform-compatibility-matrix.md](./platform-compatibility-matrix.md) |
+
+### 11.1 关键补充
+
+1. **核心 Frontmatter 仍只含 name/description/requires**；版本进入 `skill.yaml`，平台字段进入 `platforms/<platform>/skill-metadata.yaml`。
+2. **Skill 不承担 Workflow 调度**：超时、重试、门禁暂停和状态机由 Orchestration 负责；Skill 返回 `ok/needs_input/needs_approval/blocked/failed`。
+3. **输入输出必须可验证**：结构化 IO 使用 JSON Schema Draft 2020-12；Artifact 引用遵循 ADR-005。
+4. **安全只声明不授权**：`requires.permissions` 是需求；R0–R4/SA/G6 的实际执行由安全控制层负责。
+5. **测试分级**：Skill 级测试（元数据/Schema/触发/IO/异常/安全）不等同于 Workflow 的 G4/G5。
+6. **版本与依赖**：SemVer 2.0.0；依赖 Skill/Tool/通用能力，依赖平台名不得进入核心。
+7. **参考 Skill**：`skills/requirements-clarity/` 作为 P1-001 最小可执行样例，用于验证标准。
+
+### 11.2 与 P0 的关系
+
+- 不改变 P0 的六概念、L6 适配边界、R0–R4、G1–G6 或 Task Context 决策。
+- P0 `skill-architecture.md` 继续定义 Skill 的架构关系；P1 standards 提供字段/契约/测试细节。
+- 平台能力状态以 [platform-compatibility-matrix.md](./platform-compatibility-matrix.md) 的证据等级为准；未实测能力不得写成 Verified。
+
+---
+
+**P1-001 状态：** 设计产出，待 ChatGPT 评审。未实现运行时校验器、编排引擎或平台适配器。

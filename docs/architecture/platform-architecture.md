@@ -42,7 +42,7 @@
 
 ## 4. 平台能力矩阵（设计假设，未实测）
 
-> **状态说明：** 下表是**设计假设矩阵**，不是验证结果。除第 5 节列出的 OpenClaw CLI 能力外，P0 阶段没有对任何平台进行 SDD 能力实测。P7 之前不得据此宣称任何平台「兼容」或「支持 SDD」。
+> **状态说明：** 下表是**设计假设矩阵**，不是验证结果。除第 5 节列出的 OpenClaw CLI 能力外，P0 阶段没有对任何平台进行 SDD 能力实测。P7 之前不得据此宣称任何平台「兼容」或「支持 SDD」。P1-001 的详细证据台账见 [platform-compatibility-matrix.md](./platform-compatibility-matrix.md)；其中 Documented 仍不等于 Verified。
 
 | 能力 | Codex | Claude Code | Cursor | Gemini CLI | OpenCode | OpenClaw |
 |------|-------|-------------|--------|------------|----------|----------|
