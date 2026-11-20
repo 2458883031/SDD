@@ -79,7 +79,7 @@
 
 | 任务类型 | 复杂度 | 推荐工作流 | 必需门禁 |
 |----------|--------|-----------|----------|
-| simple_change | L1 | simple-task | G4/G5 简化，安全约束不跳过 |
+| simple_change | L1 | simple-task | G4（简化，独立 Review 不跳过）、G5（简化）；安全约束不跳过 |
 | bug_fix | L2 | bug-fix | G4、G5 |
 | feature_dev | L2/L3 | feature-development | G1、G2、G3、G4、G5（部署时 G6） |
 | refactoring | L3 | refactoring | G1、G2、G3、G4、G5（部署时 G6） |
@@ -117,3 +117,4 @@ Workflow 节点字段、失败路径、重试、超时和审批暂停/恢复语�
 ## 修订记录
 
 - **2026-11-20（P0-002）**：明确编排引擎与 orchestration Skill 的边界；将 Review/Testing 定义为并行且共同满足质量门禁；Deployment 必须依赖 G4/G5；门禁规则统一引用 ADR-006；Workflow DAG 语义独立定义。
+- **2026-11-20（P0-003）**：简单修改 Workflow 增加独立 Code Review；G4 与 G5 并行且共同构成质量门禁；G6 在生产部署动作之前检查。

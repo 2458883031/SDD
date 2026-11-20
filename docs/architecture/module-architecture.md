@@ -81,10 +81,20 @@ coding ────────────────┐
 ### 简单修改（L1）
 
 ```text
-coding → testing/automated checks → (G4/G5 简化) → end
+coding ────────────────┐
+    │                   │
+    ├── code-review ────┤
+    │   (G4)            │
+    └── testing ────────┤
+        (G5)            │
+                        ▼
+                 quality gate
+                 (G4 AND G5)
+                        ↓
+                       end
 ```
 
-简单修改允许省略 requirements/analysis/design，但仍需必要的代码检查与验证；不得跳过安全约束。
+简单修改允许省略 requirements/analysis/design，但必须包含独立 Code Review（简化 G4）和必要测试（简化 G5）；两者可并行，质量门禁为 G4 AND G5。纯文档变更 G4 可 N/A，任何代码变更不得跳过 G4。
 
 ### Bug 修复（L2）
 
