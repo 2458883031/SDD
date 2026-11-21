@@ -571,7 +571,83 @@ Coding 遇到设计缺失时必须反馈/返回 `needs_input`，不得自行做�
 
 ---
 
-## 十五、最终状态
+## 十五、R0 验证结果（实际执行）
+
+以下检查均在授权基线 `7c57ecb` 上实际执行，退出码为 0；报告新增后仅重新执行静态解析检查。
+
+### 15.1 P1-002 Orchestration
+
+```text
+ORCHESTRATION VALIDATION PASSED
+schemas=5 state_machines=5
+examples: workflows=10 tasks=5 gates=3 approvals=3 evidence=3
+schema_positive=24 schema_negative=32
+workflow_graph_positive=10 workflow_graph_negative=21
+state_transitions_positive=77 state_transitions_negative=245
+transition_definitions=77 transition_tests=322 guard_cases=18
+parallel_cases=19 task_context_cases=11 gate_cases=15
+approval_cases=111 scope_cases=15 expiry_cases=6 time_fail_closed_cases=15 path_cases=12
+dag_branch_cases=4 parallel_join_cases=6
+failure_cases=16 security_cases=134
+yaml_blocks_checked=12 registry_ids=7
+runtime_behavior=NOT_EXECUTED
+```
+
+### 15.2 Requirements R1
+
+```text
+REFERENCE SKILL VALIDATION PASSED
+structure=passed schema=Draft202012 examples_in=2 examples_out=7
+cases_input_validated=8 invalid_cases_rejected=6
+semver_valid=6 semver_invalid=6
+yaml_blocks_checked=12 metadata_examples=1 registry_ids=7
+negative_metadata_cases_passed=5
+optional_positive_cases_passed=2 optional_negative_cases_passed=9
+requirements_semantic_positive=7 requirements_schema_negative=13 requirements_semantic_negative=6
+runtime_behavior=NOT_EXECUTED platform_entries=1
+```
+
+### 15.3 Analysis R2
+
+```text
+ANALYSIS VALIDATION PASSED
+schemas=2 input_examples=3 output_examples=3
+input_positive=3 output_positive=3 cases=3 invalid_cases=4
+schema_negative=19 semantic_negative=22
+f1_negative=8 f1_positive=1 f2_cases=8 f3_cases=2
+trace_negative=6 trace_positive=2
+resolved_negative=42 resolved_positive=4
+f7_negative=16 f7_negative_passed=16
+f7_vectors=30 f7_vectors_passed=30 f7_identity_positive=4
+acceptance_retained_negative=6 acceptance_retained_positive=1
+runtime_behavior=NOT_EXECUTED
+```
+
+### 15.4 全仓静态检查
+
+```text
+STATIC VALIDATION PASSED json=43 yaml=17 markdown=78
+duplicate_json_yaml_keys=checked markdown_links=ok markdown_fences=ok
+```
+
+- JSON 43 个文件解析成功；
+- YAML 17 个文件解析成功，重复键检查通过；
+- Markdown 78 个文件链接 0 断链，代码围栏无未闭合；
+- SemVer 由 Requirements R1 校验器覆盖（`semver_valid=6 semver_invalid=6`）；
+- `git diff --check` 无错误；
+- `git show --check` 对 R0 两个提交均无错误。
+
+### 15.5 未执行
+
+- 未执行 Design Skill Runtime；
+- 未执行 WorkflowRunner / GateController / Approval Runtime；
+- 未执行六平台兼容性测试；
+- 未配置或未声称 CI；
+- 所有测试均为静态/只读校验。
+
+---
+
+## 十六、最终状态
 
 **P1-003-R3-R0 COMPLETE（本计划）**
 

@@ -44,7 +44,7 @@
 | 工作区 clean | `git status --short` 无输出 |
 | main 与 origin/main 均为 `50df231` | `git rev-parse main` / `git rev-parse origin/main` |
 | main 是当前分支祖先 | `git merge-base --is-ancestor main HEAD` 返回成功 |
-| 当前分支比 main 多 19 个提交 | `git rev-list --count main..HEAD` |
+| 当前分支比 main 多 19 个提交（截至授权基线 `7c57ecb`） | `git rev-list --count main..HEAD` |
 | R1 Requirements、R2 Analysis 在授权分支上完成，但尚未合并 main | Git 图显示 R1/R2 提交位于 `50df231` 之后 |
 | 没有 Design Skill 实现提交 | `git log --all --oneline -- skills/design skills/development/design` 无输出 |
 
