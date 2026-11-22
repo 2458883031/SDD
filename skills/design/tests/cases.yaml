@@ -1,0 +1,274 @@
+skill: design
+version: 0.1.0
+description: Design Skill case fixtures for schema and contract validation
+cases:
+- id: DESIGN-CASE-001
+  scenario: L1 轻量设计 - 单模块小改动
+  input_example: examples/example-input-l1.json
+  output_example: examples/example-output-l1.json
+  expect:
+    status: ok
+    required_design_fields:
+    - design_id
+    - design_version
+    - created_at
+    - source_requirements_ref
+    - source_analysis_ref
+    - complexity
+    - design_summary
+    - decisions
+    - architecture_overview
+    - test_strategy
+    - requirements_traceability
+    - analysis_traceability
+    - risks
+    - assumptions
+    - unknowns
+    - open_questions
+    input_schema_valid: true
+    coverage_statuses:
+    - not_applicable
+    - deferred
+  standard_refs:
+  - design-standard.md §6.1 L1
+  - design-standard.md §4
+  schema_refs:
+  - output.schema.json okData
+  layer: contract
+- id: DESIGN-CASE-002
+  scenario: L2 标准设计 - 多模块/接口变更
+  input_example: examples/example-input-l2.json
+  output_example: examples/example-output-l2.json
+  expect:
+    status: ok
+    required_design_fields:
+    - design_id
+    - design_version
+    - created_at
+    - source_requirements_ref
+    - source_analysis_ref
+    - complexity
+    - design_summary
+    - decisions
+    - architecture_overview
+    - test_strategy
+    - requirements_traceability
+    - analysis_traceability
+    - risks
+    - assumptions
+    - unknowns
+    - open_questions
+    - interfaces
+    - data_models
+    input_schema_valid: true
+  standard_refs:
+  - design-standard.md §6.2 L2
+  - design-standard.md §11
+  schema_refs:
+  - output.schema.json okData
+  layer: contract
+- id: DESIGN-CASE-003
+  scenario: L3 完整设计 - 多组件/架构/迁移
+  input_example: examples/example-input-l3.json
+  output_example: examples/example-output-l3.json
+  expect:
+    status: ok
+    required_design_fields:
+    - design_id
+    - design_version
+    - created_at
+    - source_requirements_ref
+    - source_analysis_ref
+    - complexity
+    - design_summary
+    - decisions
+    - architecture_overview
+    - test_strategy
+    - requirements_traceability
+    - analysis_traceability
+    - risks
+    - assumptions
+    - unknowns
+    - open_questions
+    - components
+    - modules
+    - interfaces
+    - data_models
+    - data_flows
+    - failure_handling
+    - security_design
+    - performance_scalability
+    - migration_rollback
+    - design_change_impact
+    input_schema_valid: true
+  standard_refs:
+  - design-standard.md §6.3 L3
+  - design-standard.md §10-16
+  schema_refs:
+  - output.schema.json okData
+  layer: contract
+- id: DESIGN-CASE-004
+  scenario: 合法 N/A 覆盖 - 条件字段正确标记不适用
+  input_example: examples/example-input-coverage.json
+  output_example: examples/example-output-coverage.json
+  expect:
+    status: ok
+    required_design_fields:
+    - design_id
+    - design_version
+    - created_at
+    - source_requirements_ref
+    - source_analysis_ref
+    - complexity
+    - design_summary
+    - decisions
+    - architecture_overview
+    - test_strategy
+    - requirements_traceability
+    - analysis_traceability
+    - risks
+    - assumptions
+    - unknowns
+    - open_questions
+    input_schema_valid: true
+    coverage_statuses:
+    - not_applicable
+  standard_refs:
+  - design-standard.md §4.1
+  - design-standard.md §18
+  schema_refs:
+  - output.schema.json coverageItem
+  layer: contract
+- id: DESIGN-CASE-005
+  scenario: 合法 Deferred - 延后项有理由和后续条件
+  input_example: examples/example-input-coverage.json
+  output_example: examples/example-output-coverage.json
+  expect:
+    status: ok
+    input_schema_valid: true
+    coverage_statuses:
+    - deferred
+  standard_refs:
+  - design-standard.md §18
+  schema_refs:
+  - output.schema.json coverageItem.deferred
+  layer: contract
+- id: DESIGN-CASE-006
+  scenario: 合法偏离推荐 - deviation_from_recommendation 完整
+  input_example: examples/example-input-deviation.json
+  output_example: examples/example-output-deviation.json
+  expect:
+    status: ok
+    required_design_fields:
+    - design_id
+    - design_version
+    - created_at
+    - source_requirements_ref
+    - source_analysis_ref
+    - complexity
+    - design_summary
+    - decisions
+    - architecture_overview
+    - test_strategy
+    - requirements_traceability
+    - analysis_traceability
+    - risks
+    - assumptions
+    - unknowns
+    - open_questions
+    input_schema_valid: true
+    require_deviation: true
+  standard_refs:
+  - design-standard.md §7.3
+  schema_refs:
+  - output.schema.json decisionItem.deviation_from_recommendation
+  layer: contract
+- id: DESIGN-CASE-007
+  scenario: 合法 AC 映射 - acceptance_criteria_mapping 完整
+  input_example: examples/example-input-l2.json
+  output_example: examples/example-output-l2.json
+  expect:
+    status: ok
+    input_schema_valid: true
+    require_ac_mapping: true
+  standard_refs:
+  - design-standard.md §17
+  - design-standard.md §16
+  schema_refs:
+  - output.schema.json testStrategy.acceptance_criteria_mapping
+  layer: contract
+- id: DESIGN-CASE-008
+  scenario: 合法 Design 变更 - existing_design + change_impact
+  input_example: examples/example-input-change.json
+  output_example: examples/example-output-change.json
+  expect:
+    status: ok
+    required_design_fields:
+    - design_id
+    - design_version
+    - created_at
+    - source_requirements_ref
+    - source_analysis_ref
+    - complexity
+    - design_summary
+    - decisions
+    - architecture_overview
+    - test_strategy
+    - requirements_traceability
+    - analysis_traceability
+    - risks
+    - assumptions
+    - unknowns
+    - open_questions
+    - design_change_impact
+    input_schema_valid: true
+    require_change_impact: true
+  standard_refs:
+  - design-standard.md §19
+  schema_refs:
+  - output.schema.json changeImpact
+  - input.schema.json existing_design
+  layer: contract
+- id: DESIGN-CASE-009
+  scenario: needs_input - 缺少 analysis_ref
+  input_example: examples/example-input-needs-input.json
+  output_example: examples/example-output-needs-input.json
+  expect:
+    status: needs_input
+    questions_min: 1
+    input_schema_valid: true
+  standard_refs:
+  - design-standard.md §1.2
+  - design-standard.md §24
+  schema_refs:
+  - output.schema.json needsInputData
+  layer: contract
+- id: DESIGN-CASE-010
+  scenario: blocked - complexity 缺失
+  input_example: examples/example-input-blocked.json
+  output_example: examples/example-output-blocked.json
+  expect:
+    status: blocked
+    blocked_reason_required: true
+    input_schema_valid: true
+  standard_refs:
+  - design-standard.md §3
+  - design-standard.md §24
+  schema_refs:
+  - output.schema.json blockedData
+  layer: contract
+- id: DESIGN-CASE-011
+  scenario: failed - 非法复杂度枚举
+  input_example: examples/example-input-failed.json
+  output_example: examples/example-output-failed.json
+  expect:
+    status: failed
+    errors_min: 1
+    input_schema_valid: false
+  standard_refs:
+  - design-standard.md §1.2
+  - design-standard.md §25
+  schema_refs:
+  - output.schema.json failed
+  - input.schema.json complexity enum
+  layer: schema

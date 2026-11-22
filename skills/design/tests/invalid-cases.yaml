@@ -1,0 +1,385 @@
+skill: design
+description: Invalid input/output cases that MUST be rejected by schema or contract
+  rules
+invalid_cases:
+- id: DESIGN-INVALID-001
+  layer: contract-input-status
+  why_invalid: missing requirements_ref must be handled by the Skill as needs_input,
+    not by Schema required
+  rule_source: design-standard.md §3, SKILL.md missing-input decision table
+  expected_result: needs_input
+  input:
+    analysis_ref:
+      path: artifacts/task-20261122-des001/analysis/analysis.md
+      version: 1
+      sha256: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+      type: analysis
+    complexity: L1
+  expected_status: needs_input
+- id: DESIGN-INVALID-002
+  layer: contract-input-status
+  why_invalid: missing analysis_ref must be handled by the Skill as needs_input, not
+    by Schema required
+  rule_source: design-standard.md §3, SKILL.md missing-input decision table
+  expected_result: needs_input
+  input:
+    requirements_ref:
+      path: artifacts/task-20261122-des001/requirements/requirements.md
+      version: 1
+      sha256: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+      type: requirements
+    complexity: L1
+  expected_status: needs_input
+- id: DESIGN-INVALID-003
+  layer: contract-input-status
+  why_invalid: missing complexity must be handled by the Skill as blocked, not by
+    Schema required
+  rule_source: design-standard.md §3, SKILL.md missing-input decision table
+  expected_result: blocked
+  input:
+    requirements_ref:
+      path: artifacts/task-20261122-des001/requirements/requirements.md
+      version: 1
+      sha256: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+      type: requirements
+    analysis_ref:
+      path: artifacts/task-20261122-des001/analysis/analysis.md
+      version: 1
+      sha256: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+      type: analysis
+  expected_status: blocked
+- id: DESIGN-INVALID-004
+  layer: schema-input
+  why_invalid: invalid complexity enum
+  rule_source: design-standard.md §3, input.schema.json complexity enum
+  expected_result: schema_reject
+  input:
+    requirements_ref:
+      path: artifacts/task-20261122-des001/requirements/requirements.md
+      version: 1
+      sha256: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+      type: requirements
+    analysis_ref:
+      path: artifacts/task-20261122-des001/analysis/analysis.md
+      version: 1
+      sha256: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+      type: analysis
+    complexity: L99
+- id: DESIGN-INVALID-005
+  layer: schema-input
+  why_invalid: wrong requirements type
+  rule_source: design-standard.md §3, input.schema.json requirementsArtifactRef
+  expected_result: schema_reject
+  input:
+    requirements_ref:
+      path: artifacts/task-20261122-des001/requirements/requirements.md
+      version: 1
+      sha256: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+      type: analysis
+    analysis_ref:
+      path: artifacts/task-20261122-des001/analysis/analysis.md
+      version: 1
+      sha256: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+      type: analysis
+    complexity: L1
+- id: DESIGN-INVALID-006
+  layer: schema-input
+  why_invalid: wrong analysis type
+  rule_source: design-standard.md §3, input.schema.json analysisArtifactRef
+  expected_result: schema_reject
+  input:
+    requirements_ref:
+      path: artifacts/task-20261122-des001/requirements/requirements.md
+      version: 1
+      sha256: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+      type: requirements
+    analysis_ref:
+      path: artifacts/task-20261122-des001/analysis/analysis.md
+      version: 1
+      sha256: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+      type: requirements
+    complexity: L1
+- id: DESIGN-INVALID-007
+  layer: schema-input
+  why_invalid: invalid SHA-256 format
+  rule_source: design-standard.md §3, input.schema.json artifactRef.sha256 pattern
+  expected_result: schema_reject
+  input:
+    requirements_ref:
+      path: artifacts/task-20261122-des001/requirements/requirements.md
+      version: 1
+      sha256: not-a-valid-sha
+      type: requirements
+    analysis_ref:
+      path: artifacts/task-20261122-des001/analysis/analysis.md
+      version: 1
+      sha256: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+      type: analysis
+    complexity: L1
+- id: DESIGN-INVALID-008
+  layer: schema-input
+  why_invalid: implicit latest instead of explicit ref
+  rule_source: design-standard.md §3
+  expected_result: schema_reject
+  input:
+    requirements_ref:
+      path: artifacts/task-20261122-des001/requirements/requirements.md
+      version: 1
+      sha256: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+      type: requirements
+    analysis_ref: latest
+    complexity: L1
+- id: DESIGN-INVALID-009
+  layer: schema-output
+  why_invalid: missing acceptance_criteria_mapping
+  rule_source: design-standard.md §17, output.schema.json testStrategy required
+  expected_result: schema_reject
+  base_output_example: examples/example-output-l1.json
+  mutation_path:
+  - data
+  - design
+  - test_strategy
+  - acceptance_criteria_mapping
+  mutation: remove
+- id: DESIGN-INVALID-010
+  layer: schema-output
+  why_invalid: empty design_refs in AC mapping
+  rule_source: design-standard.md §16, output.schema.json acceptance_criteria_mapping.design_refs
+    minItems
+  expected_result: schema_reject
+  base_output_example: examples/example-output-l1.json
+  mutation_path:
+  - data
+  - design
+  - test_strategy
+  - acceptance_criteria_mapping
+  - '0'
+  - design_refs
+  mutation: set_empty_array
+- id: DESIGN-INVALID-011
+  layer: schema-output
+  why_invalid: Key Decision missing rationale
+  rule_source: design-standard.md §7.1, output.schema.json decisionItem.rationale
+    required
+  expected_result: schema_reject
+  base_output_example: examples/example-output-l2.json
+  mutation_path:
+  - data
+  - design
+  - decisions
+  - '0'
+  - rationale
+  mutation: remove
+- id: DESIGN-INVALID-012
+  layer: schema-output
+  why_invalid: Key Decision missing alternatives_considered
+  rule_source: design-standard.md §7.1, output.schema.json decisionItem allOf key
+  expected_result: schema_reject
+  base_output_example: examples/example-output-l2.json
+  mutation_path:
+  - data
+  - design
+  - decisions
+  - '0'
+  - alternatives_considered
+  mutation: remove
+- id: DESIGN-INVALID-013
+  layer: schema-output
+  why_invalid: deviation without reason
+  rule_source: design-standard.md §7.3, output.schema.json deviation_from_recommendation.required
+  expected_result: schema_reject
+  base_output_example: examples/example-output-deviation.json
+  mutation_path:
+  - data
+  - design
+  - decisions
+  - '0'
+  - deviation_from_recommendation
+  - reason
+  mutation: remove
+- id: DESIGN-INVALID-014
+  layer: schema-output
+  why_invalid: N/A coverage without rationale
+  rule_source: design-standard.md §18, output.schema.json coverageItem.allOf not_applicable
+  expected_result: schema_reject
+  base_output_example: examples/example-output-l1.json
+  mutation_path:
+  - data
+  - design
+  - coverage
+  - '0'
+  - rationale
+  mutation: remove
+- id: DESIGN-INVALID-015
+  layer: schema-output
+  why_invalid: Deferred coverage without rationale
+  rule_source: design-standard.md §18, output.schema.json coverageItem.allOf deferred
+  expected_result: schema_reject
+  base_output_example: examples/example-output-coverage.json
+  mutation_path:
+  - data
+  - design
+  - coverage
+  - '6'
+  - rationale
+  mutation: remove
+- id: DESIGN-INVALID-016
+  layer: contract-semantic
+  why_invalid: missing security_design for L3
+  rule_source: design-standard.md §14, output.schema.json securityDesign conditional
+    required
+  expected_result: semantic_reject
+  base_output_example: examples/example-output-l3.json
+  mutation_path:
+  - data
+  - design
+  - security_design
+  mutation: remove
+  requires_semantic_validator: true
+  validator_executed: false
+- id: DESIGN-INVALID-017
+  layer: contract-semantic
+  why_invalid: missing interfaces for L2 with interface change
+  rule_source: design-standard.md §11
+  expected_result: semantic_reject
+  base_output_example: examples/example-output-l2.json
+  mutation_path:
+  - data
+  - design
+  - interfaces
+  mutation: remove
+  requires_semantic_validator: true
+  validator_executed: false
+- id: DESIGN-INVALID-018
+  layer: contract-semantic
+  why_invalid: blocking unknown with ok status
+  rule_source: design-standard.md §24, §18
+  expected_result: semantic_reject
+  base_output_example: examples/example-output-l1.json
+  mutation_path:
+  - data
+  - design
+  - unknowns
+  - '0'
+  - blocking
+  mutation: set_true
+  requires_semantic_validator: true
+  validator_executed: false
+- id: DESIGN-INVALID-019
+  layer: schema-output
+  why_invalid: fake GateDecision in output
+  rule_source: design-standard.md §23, §25; output.schema.json additionalProperties
+  expected_result: schema_reject
+  base_output_example: examples/example-output-l1.json
+  mutation_path:
+  - data
+  - design
+  mutation: add_forbidden_field_gate_decision
+- id: DESIGN-INVALID-020
+  layer: schema-output
+  why_invalid: implementation_plan in output
+  rule_source: design-standard.md §20, §25; output.schema.json additionalProperties
+  expected_result: schema_reject
+  base_output_example: examples/example-output-l1.json
+  mutation_path:
+  - data
+  - design
+  mutation: add_forbidden_field_implementation_plan
+- id: DESIGN-INVALID-021
+  layer: schema-output
+  why_invalid: design_approved in output
+  rule_source: design-standard.md §24, §25; output.schema.json additionalProperties
+  expected_result: schema_reject
+  base_output_example: examples/example-output-l1.json
+  mutation_path:
+  - data
+  - design
+  mutation: add_forbidden_field_design_approved
+- id: DESIGN-INVALID-022
+  layer: schema-output
+  why_invalid: ok status without design Artifact
+  rule_source: design-standard.md §5, output.schema.json okData artifacts minItems
+  expected_result: schema_reject
+  base_output_example: examples/example-output-l1.json
+  mutation_path:
+  - artifacts
+  mutation: set_empty_array
+- id: DESIGN-INVALID-023
+  layer: schema-output
+  why_invalid: Artifact type mismatch (report instead of design)
+  rule_source: design-standard.md §5
+  expected_result: schema_reject
+  base_output_example: examples/example-output-l1.json
+  mutation_path:
+  - artifacts
+  - '0'
+  - type
+  mutation: set_to_report
+- id: DESIGN-INVALID-024
+  layer: schema-output
+  why_invalid: confirmation_ref in output
+  rule_source: design-standard.md §24, §25; output.schema.json additionalProperties
+  expected_result: schema_reject
+  base_output_example: examples/example-output-l1.json
+  mutation_path:
+  - data
+  - design
+  mutation: add_forbidden_field_confirmation_ref
+- id: DESIGN-INVALID-025
+  layer: schema-output
+  why_invalid: Trace designed without design_refs
+  rule_source: design-standard.md §8, output.schema.json traceItem.allOf designed
+  expected_result: schema_reject
+  base_output_example: examples/example-output-l1.json
+  mutation_path:
+  - data
+  - design
+  - requirements_traceability
+  - items
+  - '0'
+  - design_refs
+  mutation: remove
+- id: DESIGN-INVALID-026
+  layer: schema-output
+  why_invalid: gate_approved in output
+  rule_source: design-standard.md §24, §25; output.schema.json additionalProperties
+  expected_result: schema_reject
+  base_output_example: examples/example-output-l1.json
+  mutation_path:
+  - data
+  - design
+  mutation: add_forbidden_field_gate_approved
+- id: DESIGN-INVALID-027
+  layer: schema-output
+  why_invalid: fake Approval in output
+  rule_source: design-standard.md §23, §25; output.schema.json additionalProperties
+  expected_result: schema_reject
+  base_output_example: examples/example-output-l1.json
+  mutation_path:
+  - data
+  - design
+  mutation: add_forbidden_field_approval
+- id: DESIGN-INVALID-028
+  layer: contract-semantic
+  why_invalid: Deferred coverage has no follow-up condition
+  rule_source: design-standard.md §18; checklist §18
+  expected_result: semantic_reject
+  base_output_example: examples/example-output-coverage.json
+  mutation_path:
+  - data
+  - design
+  - coverage
+  - '6'
+  mutation: remove
+  requires_semantic_validator: true
+  validator_executed: false
+- id: DESIGN-INVALID-029
+  layer: schema-output
+  why_invalid: fake G2 approval flag in output
+  rule_source: design-standard.md §23, §25; output.schema.json additionalProperties
+  expected_result: schema_reject
+  base_output_example: examples/example-output-l1.json
+  mutation_path:
+  - data
+  - design
+  mutation: add_forbidden_field_g2_approved
