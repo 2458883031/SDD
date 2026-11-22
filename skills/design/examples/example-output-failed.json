@@ -1,0 +1,13 @@
+{
+  "status": "failed",
+  "data": {},
+  "artifacts": [],
+  "errors": [
+    {
+      "code": "input_invalid",
+      "message": "complexity 枚举值 'L99' 不合法，必须为 L1/L2/L3",
+      "field": "complexity"
+    }
+  ],
+  "evidence": []
+}

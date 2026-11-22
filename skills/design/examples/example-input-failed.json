@@ -1,0 +1,15 @@
+{
+  "requirements_ref": {
+    "path": "artifacts/task-20261122-des001/requirements/requirements.md",
+    "version": 1,
+    "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "type": "requirements"
+  },
+  "analysis_ref": {
+    "path": "artifacts/task-20261122-des001/analysis/analysis.md",
+    "version": 1,
+    "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "type": "analysis"
+  },
+  "complexity": "L99"
+}

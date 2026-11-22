@@ -1,0 +1,293 @@
+{
+  "status": "ok",
+  "data": {
+    "design": {
+      "design_id": "DESIGN-20261122-001",
+      "design_version": "0.1.0",
+      "created_at": "2026-11-22T10:00:00Z",
+      "source_requirements_ref": {
+        "path": "artifacts/task-20261122-des001/requirements/requirements.md",
+        "version": 1,
+        "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "type": "requirements"
+      },
+      "source_analysis_ref": {
+        "path": "artifacts/task-20261122-des001/analysis/analysis.md",
+        "version": 1,
+        "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "type": "analysis"
+      },
+      "complexity": "L1",
+      "design_summary": {
+        "description": "为订单列表增加组合筛选功能，仅修改查询接口参数。",
+        "goal": "支持按状态、时间、金额范围组合筛选订单。",
+        "scope": [
+          "订单列表筛选面板",
+          "订单查询接口过滤参数"
+        ],
+        "non_goals": [
+          "不增加新订单状态",
+          "不修改支付流程",
+          "不改变订单数据模型"
+        ]
+      },
+      "selected_solution": "SOL-A",
+      "alternatives": [
+        {
+          "name": "新建独立筛选服务",
+          "reason_for_rejection": "改动范围大，复用价值低"
+        }
+      ],
+      "decisions": [
+        {
+          "decision_id": "DEC-1",
+          "decision": "在现有订单查询接口增加 status/time/amount 过滤参数。",
+          "rationale": "改动最小，复用现有权限和部署； Analysis 推荐此方案。",
+          "decision_level": "lightweight",
+          "related_requirements": [
+            "FR-1"
+          ],
+          "related_analysis": [
+            "SOL-A"
+          ]
+        }
+      ],
+      "architecture_overview": {
+        "description": "L1 轻量设计：仅涉及订单查询接口的参数扩展，不改架构。",
+        "external_systems": [
+          "订单查询服务"
+        ]
+      },
+      "test_strategy": {
+        "approach": "接口契约测试 + 单元验证",
+        "levels": [
+          "unit",
+          "integration"
+        ],
+        "acceptance_criteria_mapping": [
+          {
+            "criterion_ref": "AC-1",
+            "design_refs": [
+              "DEC-1"
+            ],
+            "verification_method": "接口契约测试：调用查询接口并校验组合筛选结果"
+          }
+        ],
+        "environments": [
+          "dev",
+          "test"
+        ],
+        "data": {
+          "dataset": "10万订单测试集"
+        },
+        "verification_methods": [
+          "contract_test",
+          "unit_test"
+        ]
+      },
+      "requirements_traceability": {
+        "items": [
+          {
+            "source_type": "functional_requirement",
+            "source_id": "FR-1",
+            "disposition": "designed",
+            "design_refs": [
+              "DEC-1"
+            ]
+          },
+          {
+            "source_type": "non_functional_requirement",
+            "source_id": "NFR-1",
+            "disposition": "mapped",
+            "design_refs": [
+              "DEC-1"
+            ]
+          },
+          {
+            "source_type": "constraint",
+            "source_id": "复用现有订单状态枚举",
+            "disposition": "retained"
+          },
+          {
+            "source_type": "constraint",
+            "source_id": "不修改订单数据模型",
+            "disposition": "retained"
+          },
+          {
+            "source_type": "assumption",
+            "source_id": "ASM-1",
+            "disposition": "retained"
+          },
+          {
+            "source_type": "unknown",
+            "source_id": "UNK-1",
+            "disposition": "retained"
+          },
+          {
+            "source_type": "open_question",
+            "source_id": "Q-1",
+            "disposition": "retained"
+          },
+          {
+            "source_type": "acceptance_criterion",
+            "source_id": "AC-1",
+            "disposition": "designed",
+            "design_refs": [
+              "DEC-1"
+            ]
+          },
+          {
+            "source_type": "non_goal",
+            "source_id": "不增加新订单状态",
+            "disposition": "retained"
+          }
+        ]
+      },
+      "analysis_traceability": {
+        "items": [
+          {
+            "source_type": "candidate",
+            "source_id": "SOL-A",
+            "disposition": "adopted",
+            "design_refs": [
+              "DEC-1"
+            ]
+          },
+          {
+            "source_type": "candidate",
+            "source_id": "SOL-B",
+            "disposition": "rejected",
+            "rationale": "改动范围大，复用价值低"
+          },
+          {
+            "source_type": "risk",
+            "source_id": "RISK-1",
+            "disposition": "retained",
+            "rationale": "保留为设计unknown/open_question"
+          },
+          {
+            "source_type": "unknown",
+            "source_id": "UNK-1",
+            "disposition": "retained",
+            "rationale": "保留为设计unknown/open_question"
+          },
+          {
+            "source_type": "design_consideration",
+            "source_id": "DC-1",
+            "disposition": "adopted",
+            "design_refs": [
+              "DEC-1"
+            ]
+          }
+        ]
+      },
+      "risks": [
+        {
+          "risk_id": "RISK-1",
+          "description": "大数据量下查询性能未验证",
+          "category": "performance",
+          "likelihood": "medium",
+          "impact": "medium",
+          "severity": "medium",
+          "mitigation": "增加索引测试",
+          "residual_risk": "medium",
+          "status": "known"
+        }
+      ],
+      "assumptions": [
+        {
+          "id": "ASM-1",
+          "statement": "现有订单状态枚举足够支持业务筛选",
+          "basis": "订单模型已有状态字段",
+          "status": "unconfirmed"
+        }
+      ],
+      "unknowns": [
+        {
+          "id": "UNK-1",
+          "description": "查询接口索引细节未在代码中确认",
+          "blocking": false,
+          "status": "unknown"
+        }
+      ],
+      "open_questions": [
+        {
+          "id": "Q-1",
+          "question": "金额范围是否包含边界值？",
+          "blocking": false,
+          "status": "open"
+        }
+      ],
+      "coverage": [
+        {
+          "area": "architecture",
+          "status": "not_applicable",
+          "rationale": "L1 仅扩展查询接口参数，不改系统架构"
+        },
+        {
+          "area": "interfaces",
+          "status": "designed",
+          "rationale": "订单查询接口参数扩展",
+          "design_refs": [
+            "IF-1"
+          ]
+        },
+        {
+          "area": "data_models",
+          "status": "not_applicable",
+          "rationale": "不修改订单数据模型"
+        },
+        {
+          "area": "state_model",
+          "status": "not_applicable",
+          "rationale": "无状态变化"
+        },
+        {
+          "area": "failure_handling",
+          "status": "not_applicable",
+          "rationale": "无新增外部依赖或失败路径"
+        },
+        {
+          "area": "security_design",
+          "status": "not_applicable",
+          "rationale": "复用现有权限，无新安全边界"
+        },
+        {
+          "area": "performance_scalability",
+          "status": "deferred",
+          "rationale": "性能验证延后到集成测试；条件：完成 10 万订单基准并记录 p95"
+        },
+        {
+          "area": "migration_rollback",
+          "status": "not_applicable",
+          "rationale": "无数据迁移"
+        }
+      ],
+      "interfaces": [
+        {
+          "id": "IF-1",
+          "name": "订单查询接口参数扩展",
+          "input": "GET /api/orders?status=&time_from=&time_to=&amount_min=&amount_max=",
+          "output": "订单列表 JSON",
+          "errors": [
+            "400 参数校验失败",
+            "500 查询超时"
+          ],
+          "version": "v1",
+          "compatibility": "新增参数可选，向后兼容",
+          "idempotent": true
+        }
+      ]
+    }
+  },
+  "artifacts": [
+    {
+      "path": "artifacts/task-20261122-des001/design/design.md",
+      "version": 1,
+      "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "type": "design"
+    }
+  ],
+  "errors": [],
+  "evidence": []
+}

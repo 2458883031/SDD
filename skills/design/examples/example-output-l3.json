@@ -1,0 +1,620 @@
+{
+  "status": "ok",
+  "data": {
+    "design": {
+      "design_id": "DESIGN-20261122-003",
+      "design_version": "0.1.0",
+      "created_at": "2026-11-22T12:00:00Z",
+      "source_requirements_ref": {
+        "path": "artifacts/task-20261122-des001/requirements/requirements.md",
+        "version": 1,
+        "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "type": "requirements"
+      },
+      "source_analysis_ref": {
+        "path": "artifacts/task-20261122-des001/analysis/analysis.md",
+        "version": 1,
+        "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "type": "analysis"
+      },
+      "complexity": "L3",
+      "design_summary": {
+        "description": "订单列表组合筛选功能的完整系统设计，包含架构变更、数据迁移和零停机部署方案。",
+        "goal": "支持按状态、时间、金额范围组合筛选订单，p95 < 500ms，零停机部署。",
+        "scope": [
+          "订单查询服务架构",
+          "数据库索引",
+          "API 版本管理",
+          "迁移脚本",
+          "回滚方案"
+        ],
+        "non_goals": [
+          "不增加新订单状态",
+          "不修改支付流程"
+        ]
+      },
+      "selected_solution": "SOL-A",
+      "alternatives": [
+        {
+          "name": "新建独立筛选服务",
+          "reason_for_rejection": "跨服务调用增加延迟，运维复杂度高"
+        },
+        {
+          "name": "全量数据客户端过滤",
+          "reason_for_rejection": "大数据量下性能不可接受"
+        },
+        {
+          "name": "物化视图预计算",
+          "reason_for_rejection": "存储成本高，实时更新复杂"
+        }
+      ],
+      "decisions": [
+        {
+          "decision_id": "DEC-1",
+          "decision": "订单查询服务增加 v2 接口，v1 保留向后兼容。",
+          "rationale": "零停机部署要求：新接口上线后逐步迁移客户端。",
+          "alternatives_considered": [
+            {
+              "name": "原地修改 v1 接口",
+              "reason_for_rejection": "不兼容变更，需停机"
+            },
+            {
+              "name": "直接废弃 v1",
+              "reason_for_rejection": "影响现有客户端"
+            }
+          ],
+          "related_requirements": [
+            "FR-1",
+            "NFR-1"
+          ],
+          "related_analysis": [
+            "SOL-A"
+          ],
+          "consequences": [
+            "需维护双版本",
+            "需客户端迁移计划"
+          ],
+          "decision_level": "key"
+        },
+        {
+          "decision_id": "DEC-2",
+          "decision": "为 status/time/amount 字段创建复合索引。",
+          "rationale": "满足 p95 < 500ms 性能要求。",
+          "alternatives_considered": [
+            {
+              "name": "全表扫描",
+              "reason_for_rejection": "性能不达标"
+            },
+            {
+              "name": "单独索引",
+              "reason_for_rejection": "组合查询效率低"
+            }
+          ],
+          "related_requirements": [
+            "NFR-1"
+          ],
+          "related_analysis": [
+            "SOL-A"
+          ],
+          "consequences": [
+            "索引创建需在线 DDL",
+            "写入性能轻微下降"
+          ],
+          "decision_level": "key"
+        },
+        {
+          "decision_id": "DEC-3",
+          "decision": "筛选面板使用 Debounce 300ms。",
+          "rationale": "减少频繁请求。",
+          "decision_level": "lightweight"
+        }
+      ],
+      "architecture_overview": {
+        "description": "前端筛选面板 → 订单查询服务 v2 → PostgreSQL (复合索引)；v1 接口保留兼容。",
+        "system_boundary": "订单查询服务边界扩展，新增 v2 接口。",
+        "deployment_view": "容器化部署，蓝绿发布支持零停机。",
+        "runtime_view": "查询请求经 API Gateway 路由到 v1/v2。",
+        "external_systems": [
+          "PostgreSQL",
+          "API Gateway",
+          "订单列表前端"
+        ]
+      },
+      "modules": [
+        {
+          "id": "MOD-1",
+          "name": "订单查询服务 v2",
+          "responsibility": "处理组合筛选查询",
+          "dependencies": [
+            "MOD-2"
+          ]
+        },
+        {
+          "id": "MOD-2",
+          "name": "订单数据库",
+          "responsibility": "存储订单数据和索引",
+          "dependencies": []
+        }
+      ],
+      "interfaces": [
+        {
+          "id": "IF-1",
+          "name": "订单查询 v2 接口",
+          "input": "GET /api/v2/orders?status=&time_range=&amount_range=&page=&size=",
+          "output": "订单列表 JSON (分页)",
+          "errors": [
+            "400 参数校验失败",
+            "429 限流",
+            "500 查询超时"
+          ],
+          "version": "v2",
+          "compatibility": "v1 保留，v2 新增",
+          "idempotent": true
+        }
+      ],
+      "data_models": [
+        {
+          "id": "DM-1",
+          "name": "OrderFilterParamsV2",
+          "description": "v2 接口筛选参数",
+          "fields": [
+            {
+              "name": "status",
+              "type": "string[]",
+              "constraints": "可选，枚举值"
+            },
+            {
+              "name": "time_range",
+              "type": "object",
+              "constraints": "{start: ISO8601, end: ISO8601}"
+            },
+            {
+              "name": "amount_range",
+              "type": "object",
+              "constraints": "{min: number, max: number}"
+            },
+            {
+              "name": "page",
+              "type": "integer",
+              "constraints": "默认 1"
+            },
+            {
+              "name": "size",
+              "type": "integer",
+              "constraints": "默认 20, max 100"
+            }
+          ],
+          "sensitive": false
+        }
+      ],
+      "data_flows": [
+        {
+          "id": "DF-1",
+          "name": "筛选查询流",
+          "source": "前端",
+          "destination": "订单查询服务 v2",
+          "transformations": [
+            "参数校验",
+            "索引查询",
+            "分页"
+          ],
+          "sensitive": false
+        }
+      ],
+      "failure_handling": {
+        "failure_classification": [
+          "参数校验失败",
+          "查询超时",
+          "数据库连接失败"
+        ],
+        "retry_strategy": "查询超时最多重试 1 次",
+        "compensation": "无事务，无需补偿",
+        "degradation": "超时降级返回部分结果",
+        "rollback_path": "切换流量到 v1 接口"
+      },
+      "security_design": {
+        "trust_boundaries": [
+          "前端 → API Gateway",
+          "API Gateway → 订单查询服务"
+        ],
+        "reference_r0_r4_sa": "R1 读取项目上下文；复用现有订单查询权限。",
+        "permission_model": "复用现有 RBAC，筛选操作不新增权限",
+        "data_protection": [
+          "筛选参数不记录敏感信息",
+          "查询日志脱敏"
+        ],
+        "audit_requirements": "查询操作记录审计日志"
+      },
+      "performance_scalability": {
+        "performance_targets": [
+          "p95 < 500ms (10万订单测试集)"
+        ],
+        "capacity_assumptions": [
+          "最大 100万订单",
+          "并发查询 < 100 QPS"
+        ],
+        "scalability_points": [
+          "水平扩展查询服务实例",
+          "数据库读写分离"
+        ],
+        "degradation_strategy": "超时降级返回部分结果",
+        "verification_method": "性能基准测试 + 负载测试"
+      },
+      "migration_rollback": {
+        "migration_steps": [
+          "创建复合索引 (在线 DDL)",
+          "部署 v2 接口",
+          "灰度放量",
+          "迁移客户端",
+          "废弃 v1"
+        ],
+        "rollback_plan": "切换流量到 v1 接口；索引可后续删除",
+        "compatibility_strategy": "v1/v2 共存，逐步迁移",
+        "data_backup": "索引创建前备份表结构"
+      },
+      "test_strategy": {
+        "approach": "契约测试 + 性能测试 + 集成测试 + 回归测试",
+        "levels": [
+          "unit",
+          "integration",
+          "performance",
+          "regression"
+        ],
+        "acceptance_criteria_mapping": [
+          {
+            "criterion_ref": "AC-1",
+            "design_refs": [
+              "IF-1",
+              "DEC-1"
+            ],
+            "verification_method": "接口契约测试：v2 组合筛选结果一致"
+          },
+          {
+            "criterion_ref": "AC-2",
+            "design_refs": [
+              "DEC-2"
+            ],
+            "verification_method": "性能测试：p95 < 500ms"
+          },
+          {
+            "criterion_ref": "AC-3",
+            "design_refs": [
+              "DEC-1"
+            ],
+            "verification_method": "兼容性测试：v1 接口行为不变"
+          }
+        ],
+        "environments": [
+          "dev",
+          "test",
+          "staging"
+        ],
+        "data": {
+          "dataset": "10万订单测试集",
+          "schema": "生产数据镜像"
+        },
+        "verification_methods": [
+          "contract_test",
+          "performance_test",
+          "compatibility_test",
+          "regression_test"
+        ]
+      },
+      "requirements_traceability": {
+        "items": [
+          {
+            "source_type": "functional_requirement",
+            "source_id": "FR-1",
+            "disposition": "designed",
+            "design_refs": [
+              "DEC-1",
+              "IF-1"
+            ]
+          },
+          {
+            "source_type": "non_functional_requirement",
+            "source_id": "NFR-1",
+            "disposition": "designed",
+            "design_refs": [
+              "DEC-2"
+            ]
+          },
+          {
+            "source_type": "constraint",
+            "source_id": "零停机部署",
+            "disposition": "designed",
+            "design_refs": [
+              "DEC-1"
+            ]
+          },
+          {
+            "source_type": "constraint",
+            "source_id": "不修改订单数据模型",
+            "disposition": "retained"
+          },
+          {
+            "source_type": "dependency",
+            "source_id": "DEP-1",
+            "disposition": "mapped",
+            "design_refs": [
+              "IF-1"
+            ]
+          },
+          {
+            "source_type": "assumption",
+            "source_id": "ASM-1",
+            "disposition": "retained"
+          },
+          {
+            "source_type": "unknown",
+            "source_id": "UNK-1",
+            "disposition": "retained"
+          },
+          {
+            "source_type": "open_question",
+            "source_id": "Q-1",
+            "disposition": "retained"
+          },
+          {
+            "source_type": "acceptance_criterion",
+            "source_id": "AC-1",
+            "disposition": "designed",
+            "design_refs": [
+              "IF-1",
+              "DEC-1"
+            ]
+          },
+          {
+            "source_type": "acceptance_criterion",
+            "source_id": "AC-2",
+            "disposition": "designed",
+            "design_refs": [
+              "DEC-2"
+            ]
+          },
+          {
+            "source_type": "acceptance_criterion",
+            "source_id": "AC-3",
+            "disposition": "designed",
+            "design_refs": [
+              "DEC-1"
+            ]
+          },
+          {
+            "source_type": "non_goal",
+            "source_id": "不增加新订单状态",
+            "disposition": "retained"
+          }
+        ]
+      },
+      "analysis_traceability": {
+        "items": [
+          {
+            "source_type": "candidate",
+            "source_id": "SOL-A",
+            "disposition": "adopted",
+            "design_refs": [
+              "DEC-1",
+              "DEC-2",
+              "IF-1"
+            ]
+          },
+          {
+            "source_type": "candidate",
+            "source_id": "SOL-B",
+            "disposition": "rejected",
+            "rationale": "跨服务调用增加延迟，运维复杂度高"
+          },
+          {
+            "source_type": "candidate",
+            "source_id": "SOL-C",
+            "disposition": "rejected",
+            "rationale": "大数据量下性能不可接受"
+          },
+          {
+            "source_type": "candidate",
+            "source_id": "SOL-D",
+            "disposition": "rejected",
+            "rationale": "存储成本高，实时更新复杂"
+          },
+          {
+            "source_type": "risk",
+            "source_id": "RISK-1",
+            "disposition": "adapted",
+            "design_refs": [
+              "DEC-2"
+            ],
+            "rationale": "通过复合索引和性能测试缓解"
+          },
+          {
+            "source_type": "unknown",
+            "source_id": "UNK-1",
+            "disposition": "retained",
+            "rationale": "保留为设计unknown/open_question"
+          },
+          {
+            "source_type": "design_consideration",
+            "source_id": "DC-1",
+            "disposition": "adopted",
+            "design_refs": [
+              "DEC-3"
+            ]
+          }
+        ]
+      },
+      "risks": [
+        {
+          "risk_id": "RISK-1",
+          "description": "复合索引创建影响写入性能",
+          "category": "performance",
+          "likelihood": "medium",
+          "impact": "low",
+          "severity": "low",
+          "mitigation": "在线 DDL，错峰执行",
+          "residual_risk": "low",
+          "status": "known"
+        },
+        {
+          "risk_id": "RISK-2",
+          "description": "v1/v2 共存期间客户端迁移不完全",
+          "category": "operational",
+          "likelihood": "low",
+          "impact": "medium",
+          "severity": "medium",
+          "mitigation": "灰度放量，监控 v1 流量",
+          "residual_risk": "medium",
+          "status": "known"
+        }
+      ],
+      "assumptions": [
+        {
+          "id": "ASM-1",
+          "statement": "现有订单状态枚举足够支持业务筛选",
+          "basis": "订单模型已有状态字段",
+          "status": "unconfirmed"
+        }
+      ],
+      "unknowns": [
+        {
+          "id": "UNK-1",
+          "description": "查询接口索引细节未在代码中确认",
+          "blocking": false,
+          "status": "unknown"
+        }
+      ],
+      "open_questions": [
+        {
+          "id": "Q-1",
+          "question": "金额范围是否包含边界值？",
+          "blocking": false,
+          "status": "open"
+        }
+      ],
+      "design_change_impact": {
+        "changed": [
+          "查询接口",
+          "数据库索引"
+        ],
+        "affected_areas": [
+          "interfaces",
+          "data_models",
+          "performance_scalability"
+        ],
+        "affected_artifacts": [
+          {
+            "path": "artifacts/task-20261122-des001/requirements/requirements.md",
+            "version": 1,
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "type": "requirements"
+          },
+          {
+            "path": "artifacts/task-20261122-des001/analysis/analysis.md",
+            "version": 1,
+            "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "type": "analysis"
+          }
+        ],
+        "downstream_stages": [
+          "planning",
+          "coding",
+          "review",
+          "testing"
+        ],
+        "rationale": "接口和索引变更影响 Planning/G3 任务拆解和 Testing/G5 用例设计",
+        "requires_redesign": false
+      },
+      "coverage": [
+        {
+          "area": "architecture",
+          "status": "designed",
+          "design_refs": [
+            "DEC-1"
+          ]
+        },
+        {
+          "area": "modules",
+          "status": "designed",
+          "design_refs": [
+            "MOD-1",
+            "MOD-2"
+          ]
+        },
+        {
+          "area": "interfaces",
+          "status": "designed",
+          "design_refs": [
+            "IF-1"
+          ]
+        },
+        {
+          "area": "data_models",
+          "status": "designed",
+          "design_refs": [
+            "DM-1"
+          ]
+        },
+        {
+          "area": "data_flows",
+          "status": "designed",
+          "design_refs": [
+            "DF-1"
+          ]
+        },
+        {
+          "area": "state_model",
+          "status": "not_applicable",
+          "rationale": "无有状态变化"
+        },
+        {
+          "area": "failure_handling",
+          "status": "designed",
+          "design_refs": [
+            "DEC-1"
+          ]
+        },
+        {
+          "area": "security_design",
+          "status": "designed",
+          "design_refs": [
+            "DEC-1"
+          ]
+        },
+        {
+          "area": "performance_scalability",
+          "status": "designed",
+          "design_refs": [
+            "DEC-2"
+          ]
+        },
+        {
+          "area": "migration_rollback",
+          "status": "designed",
+          "design_refs": [
+            "DEC-1"
+          ]
+        }
+      ],
+      "components": [
+        {
+          "id": "COMP-1",
+          "name": "筛选组件",
+          "responsibility": "处理筛选逻辑",
+          "boundary": "服务内",
+          "dependencies": [
+            "MOD-1"
+          ]
+        }
+      ]
+    }
+  },
+  "artifacts": [
+    {
+      "path": "artifacts/task-20261122-des001/design/design.md",
+      "version": 1,
+      "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "type": "design"
+    }
+  ],
+  "errors": [],
+  "evidence": []
+}

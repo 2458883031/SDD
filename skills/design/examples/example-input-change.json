@@ -1,0 +1,46 @@
+{
+  "requirements_ref": {
+    "path": "artifacts/task-20261122-des001/requirements/requirements.md",
+    "version": 1,
+    "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "type": "requirements"
+  },
+  "analysis_ref": {
+    "path": "artifacts/task-20261122-des001/analysis/analysis.md",
+    "version": 1,
+    "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "type": "analysis"
+  },
+  "complexity": "L2",
+  "existing_design": [
+    {
+      "path": "artifacts/task-20261122-des001/design/design-v1.md",
+      "version": 1,
+      "sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "type": "design"
+    }
+  ],
+  "change_context": {
+    "reason": "用户需求变更：增加金额范围筛选",
+    "changed_items": [
+      "筛选参数",
+      "验收标准"
+    ],
+    "previous_requirements": [
+      {
+        "path": "artifacts/task-20261122-des001/requirements/requirements.md",
+        "version": 1,
+        "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "type": "requirements"
+      }
+    ],
+    "previous_analysis": [
+      {
+        "path": "artifacts/task-20261122-des001/analysis/analysis.md",
+        "version": 1,
+        "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "type": "analysis"
+      }
+    ]
+  }
+}

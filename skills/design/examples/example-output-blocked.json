@@ -1,0 +1,9 @@
+{
+  "status": "blocked",
+  "data": {
+    "blocked_reason": "complexity 未由 Orchestration 提供，无法确定设计深度"
+  },
+  "artifacts": [],
+  "errors": [],
+  "evidence": []
+}

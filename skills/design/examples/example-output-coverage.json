@@ -1,0 +1,167 @@
+{
+  "status": "ok",
+  "data": {
+    "design": {
+      "design_id": "DESIGN-20261122-010",
+      "design_version": "0.1.0",
+      "created_at": "2026-11-22T15:00:00Z",
+      "source_requirements_ref": {
+        "path": "artifacts/task-20261122-des001/requirements/requirements.md",
+        "version": 1,
+        "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "type": "requirements"
+      },
+      "source_analysis_ref": {
+        "path": "artifacts/task-20261122-des001/analysis/analysis.md",
+        "version": 1,
+        "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "type": "analysis"
+      },
+      "complexity": "L2",
+      "design_summary": {
+        "description": "订单筛选功能设计。",
+        "goal": "支持组合筛选。",
+        "scope": [
+          "查询接口"
+        ],
+        "non_goals": []
+      },
+      "decisions": [
+        {
+          "decision_id": "DEC-1",
+          "decision": "扩展查询接口",
+          "rationale": "最小改动",
+          "decision_level": "lightweight"
+        }
+      ],
+      "architecture_overview": {
+        "description": "接口扩展设计。"
+      },
+      "test_strategy": {
+        "approach": "契约测试",
+        "levels": [
+          "unit",
+          "integration"
+        ],
+        "acceptance_criteria_mapping": [
+          {
+            "criterion_ref": "AC-1",
+            "design_refs": [
+              "DEC-1"
+            ],
+            "verification_method": "契约测试"
+          }
+        ],
+        "environments": [
+          "dev",
+          "test"
+        ],
+        "data": {},
+        "verification_methods": [
+          "contract_test"
+        ]
+      },
+      "requirements_traceability": {
+        "items": [
+          {
+            "source_type": "functional_requirement",
+            "source_id": "FR-1",
+            "disposition": "designed",
+            "design_refs": [
+              "DEC-1"
+            ]
+          }
+        ]
+      },
+      "analysis_traceability": {
+        "items": [
+          {
+            "source_type": "candidate",
+            "source_id": "SOL-A",
+            "disposition": "adopted",
+            "design_refs": [
+              "DEC-1"
+            ]
+          }
+        ]
+      },
+      "risks": [],
+      "assumptions": [],
+      "unknowns": [],
+      "open_questions": [],
+      "coverage": [
+        {
+          "area": "architecture",
+          "status": "designed",
+          "rationale": "查询服务边界不变，接口参数扩展",
+          "design_refs": [
+            "DEC-1"
+          ]
+        },
+        {
+          "area": "interfaces",
+          "status": "designed",
+          "rationale": "GET /api/orders 参数扩展",
+          "design_refs": [
+            "IF-1"
+          ]
+        },
+        {
+          "area": "data_models",
+          "status": "not_applicable",
+          "rationale": "不修改订单数据模型"
+        },
+        {
+          "area": "failure_handling",
+          "status": "not_applicable",
+          "rationale": "无新增外部依赖或失败路径"
+        },
+        {
+          "area": "state_model",
+          "status": "not_applicable",
+          "rationale": "无状态变化"
+        },
+        {
+          "area": "security_design",
+          "status": "not_applicable",
+          "rationale": "复用现有订单查询权限，无新增信任边界"
+        },
+        {
+          "area": "performance_scalability",
+          "status": "deferred",
+          "rationale": "性能基准延后到集成测试；影响：需补 p95 证据；条件：完成 10 万订单测试集"
+        },
+        {
+          "area": "migration_rollback",
+          "status": "not_applicable",
+          "rationale": "无数据迁移"
+        }
+      ],
+      "interfaces": [
+        {
+          "id": "IF-1",
+          "name": "订单查询接口参数扩展",
+          "input": "GET /api/orders?status=&time_from=&time_to=&amount_min=&amount_max=",
+          "output": "订单列表 JSON",
+          "errors": [
+            "400 参数校验失败",
+            "500 查询超时"
+          ],
+          "version": "v1",
+          "compatibility": "新增参数可选，向后兼容",
+          "idempotent": true
+        }
+      ]
+    }
+  },
+  "artifacts": [
+    {
+      "path": "artifacts/task-20261122-des001/design/design.md",
+      "version": 1,
+      "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "type": "design"
+    }
+  ],
+  "errors": [],
+  "evidence": []
+}

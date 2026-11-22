@@ -1,0 +1,12 @@
+{
+  "status": "needs_input",
+  "data": {
+    "questions": [
+      "缺少 analysis_ref，请提供 Analysis Artifact 引用",
+      "请确认筛选功能的具体性能要求"
+    ]
+  },
+  "artifacts": [],
+  "errors": [],
+  "evidence": []
+}
