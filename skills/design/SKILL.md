@@ -57,7 +57,7 @@ requires:
 
 ## 执行步骤
 
-1. **校验输入**：验证 `requirements_ref`（type=requirements）、`analysis_ref`（type=analysis）、`complexity`（L1/L2/L3）和 Artifact 身份。Schema 格式/类型/枚举错误 → `failed`/`input_invalid`；缺少必要信息且需调用方/用户补充 → `needs_input`；`complexity` 未由 Orchestration 提供、上游不可读或权限/依赖阻塞 → `blocked`。
+1. **校验输入**：先对存在的字段执行 Input Schema 校验；字段存在但类型/枚举/Artifact type/SHA 格式错误 → `failed`/`input_invalid`。`requirements_ref`/`analysis_ref`/`complexity` 缺失不在 Schema 阶段统一拒绝，由本步骤状态判断：缺少 `requirements_ref` 或 `analysis_ref` → `needs_input`（`questions` 列出所有缺失引用）；仅当引用齐全但 `complexity` 缺失 → `blocked`/`precondition_failed`。缺失引用优先于缺失 complexity，确保状态稳定可测试。
 2. **检查上游阻塞项**：Requirements 有 blocking open question/unknown/冲突 → `needs_input`/`blocked`；Analysis 有 blocking unknown/open question → `needs_input`/`blocked`。
 3. **建立 Requirements 追踪**：为 FR/NFR/constraints/dependencies/assumptions/unknowns/open_questions/acceptance_criteria/non_goals/source_refs 建立处理关系（designed/mapped/retained/resolved/not_applicable/deferred）。
 4. **建立 Analysis 追踪**：承接候选方案、风险、unknowns/open questions/design considerations；记录采纳/偏离/拒绝理由。
@@ -71,7 +71,7 @@ requires:
 
 ## 决策规则
 
-- Schema 格式/类型/枚举错误 → `failed`/`input_invalid`；缺少必要信息且可补充 → `needs_input`；Orchestration complexity 缺失、上游不可读或权限/依赖阻塞 → `blocked`。
+- Schema 格式/类型/枚举错误 → `failed`/`input_invalid`；缺少 `requirements_ref`/`analysis_ref` → `needs_input`（优先于缺失 complexity）；引用齐全但 `complexity` 缺失 → `blocked`；上游不可读或权限/依赖阻塞 → `blocked`。
 - Requirements 存在 blocking 未决项 → `needs_input`/`blocked`，不得输出完整可实施的 `ok`。
 - Analysis 存在 blocking unknown/open question → `needs_input`/`blocked`。
 - 只有一个合理方案时，必须解释其他方案为何不适用/不可行；不得编造候选。
@@ -108,7 +108,7 @@ Design Skill 只负责第 1 层并输出第 2 层的引用；G2/Gate 由 Orchest
 | 情况 | 处理 |
 |------|------|
 | Requirements/Analysis ref 类型错误、SHA 格式错误、非法复杂度枚举 | `failed`/`input_invalid` |
-| 缺少 requirements_ref/analysis_ref 或需用户补充的设计信息 | `needs_input` + `questions` |
+| 缺少 requirements_ref/analysis_ref 或需用户补充的设计信息 | `needs_input` + `questions`；缺失引用优先于缺失 complexity |
 | complexity 未由 Orchestration 提供、上游 Artifact 不可读、权限/依赖阻塞 | `blocked`/`precondition_failed` |
 | 上游 blocking 未决项 | `needs_input`/`blocked` + 部分 design |
 | 无法形成设计决策 | `needs_input`；记录缺失信息 |

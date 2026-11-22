@@ -92,7 +92,7 @@ Design **不负责**：
 
 **输入状态判断（按 P1-001 IO 契约区分，不得把所有问题都归为 `failed`）：**
 
-1. **Schema 格式/类型错误**：字段类型错误、Artifact type 错误、SHA 格式错误、非法 enum、未知字段 → `failed` + `input_invalid`。
+1. **Schema 格式/类型错误（字段存在时）**：字段类型错误、Artifact type 错误、SHA 格式错误、非法 enum、未知字段 → `failed` + `input_invalid`。`requirements_ref`/`analysis_ref`/`complexity` 故意不放入 Input Schema 顶层 `required`，缺失时交由 Skill 状态判断，而不是在 Schema 阶段统一拒绝。
 2. **必要信息缺失，需调用方/用户补充**：缺少 `requirements_ref`/`analysis_ref`，或缺少可向用户询问的设计选择信息 → `needs_input` + 最小 `questions`；若上游 Artifact 已声明但不可读取/不可达，则为 `blocked`。
 3. **Orchestration 上下文缺失**：`complexity` 缺失 → `blocked` + `precondition_failed`；`complexity` 非法枚举 → `failed` + `input_invalid`。Design 不得自行推断或降低复杂度。
 4. **权限、依赖或外部条件阻塞**：无读取权限、上游依赖未就绪、任务工作区/Artifact 路径不可用 → `blocked` + `precondition_failed`。
@@ -100,6 +100,8 @@ Design **不负责**：
 6. **内部执行错误**：设计生成过程异常且不可恢复 → `failed` + `internal_error`。
 7. Requirements/Analysis 引用 type 错误属于第 1 类 → `failed`；不得通过"最新版本"隐式选取 Artifact。
 8. 若同时提供已解析的 `requirements`/`analysis`，其来源必须与对应 Artifact 引用一致；Design 不创建第二套 Requirements/Analysis 身份。
+
+**缺失字段优先级：** 当多个必填输入同时缺失时，先返回 `needs_input`（缺少 `requirements_ref`/`analysis_ref`，`questions` 列出所有缺失项）；仅当上游引用齐全但 `complexity` 缺失时返回 `blocked`。字段存在但类型/枚举错误按第 1 类 `failed` 处理，不得继续读取 Artifact。
 
 ---
 

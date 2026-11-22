@@ -2,9 +2,9 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://sdd.local/skills/design/input.schema.json",
   "title": "DesignInput",
+  "description": "requirements_ref、analysis_ref、complexity 是 Skill 契约要求的输入，但故意不放入 JSON Schema required：缺失时由 Skill 状态逻辑返回 needs_input/blocked；字段存在时仍受类型、枚举和 Artifact 引用约束。",
   "type": "object",
   "additionalProperties": false,
-  "required": ["requirements_ref", "analysis_ref", "complexity"],
   "properties": {
     "requirements_ref": {
       "$ref": "#/$defs/requirementsArtifactRef",
