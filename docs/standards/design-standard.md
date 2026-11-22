@@ -74,12 +74,13 @@ Design **不负责**：
 
 ## 3. 输入契约
 
-遵循 `skills/design/schemas/input.schema.json`（R2 计划定义；本阶段不创建）：
+遵循 `skills/design/schemas/input.schema.json`（P1-003-R3-R2 定义）：
 
 | 字段 | 必需 | 说明 |
 |------|------|------|
 | `requirements_ref` | 是 | Requirements Artifact 引用（path/version/sha256/type=requirements） |
 | `analysis_ref` | 是 | Analysis Artifact 引用（path/version/sha256/type=analysis） |
+| `complexity` | 是 | L1/L2/L3，由 Orchestration 提供；Design 不自行判定/降低；缺失时 `blocked`，非法枚举时 `failed`/`input_invalid` |
 | `requirements` | 否 | 已解析的 Requirements `data.requirements`；复用 requirements-standard.md |
 | `analysis` | 否 | 已解析的 Analysis `data.analysis`；复用 analysis-standard.md |
 | `project_context` | 否 | 项目上下文摘要 |
@@ -87,17 +88,18 @@ Design **不负责**：
 | `existing_design` | 否 | 已有 Design Artifact 引用数组 |
 | `evidence_refs` | 否 | 外部证据引用 |
 | `change_context` | 否 | 变更原因、变更项、上一版引用 |
-| `complexity` | 否 | L1/L2/L3，由 Orchestration 提供；Design 不自行判定/降低 |
 | `requested_scope` | 否 | 本次设计范围 |
 
-**输入状态判断：**
+**输入状态判断（按 P1-001 IO 契约区分，不得把所有问题都归为 `failed`）：**
 
-- 输入缺失/结构无效 → `failed`/`input_invalid`；
-- Requirements 存在 blocking 未决项/未解决冲突 → `needs_input`/`blocked`，不得输出完整可实施的 `ok`；
-- Analysis 存在 blocking unknown/open question → `needs_input`/`blocked`，不得静默忽略；
-- Requirements/Analysis 引用类型错误 → `failed`；
-- 不得通过"最新版本"隐式选取 Artifact。
-- 若同时提供已解析的 `requirements`/`analysis`，其来源必须与对应 Artifact 引用一致；Design 不创建第二套 Requirements/Analysis 身份。
+1. **Schema 格式/类型错误**：字段类型错误、Artifact type 错误、SHA 格式错误、非法 enum、未知字段 → `failed` + `input_invalid`。
+2. **必要信息缺失，需调用方/用户补充**：缺少 `requirements_ref`/`analysis_ref`，或缺少可向用户询问的设计选择信息 → `needs_input` + 最小 `questions`；若上游 Artifact 已声明但不可读取/不可达，则为 `blocked`。
+3. **Orchestration 上下文缺失**：`complexity` 缺失 → `blocked` + `precondition_failed`；`complexity` 非法枚举 → `failed` + `input_invalid`。Design 不得自行推断或降低复杂度。
+4. **权限、依赖或外部条件阻塞**：无读取权限、上游依赖未就绪、任务工作区/Artifact 路径不可用 → `blocked` + `precondition_failed`。
+5. **上游业务阻塞**：Requirements blocking 未决项/未解决冲突，或 Analysis blocking unknown/open question → `needs_input`/`blocked`，不得输出完整可实施的 `ok`。
+6. **内部执行错误**：设计生成过程异常且不可恢复 → `failed` + `internal_error`。
+7. Requirements/Analysis 引用 type 错误属于第 1 类 → `failed`；不得通过"最新版本"隐式选取 Artifact。
+8. 若同时提供已解析的 `requirements`/`analysis`，其来源必须与对应 Artifact 引用一致；Design 不创建第二套 Requirements/Analysis 身份。
 
 ---
 
@@ -412,6 +414,7 @@ Design 必须承接 Analysis 的候选方案、风险、unknowns、open question
 
 - `test_strategy`：Required；
 - 定义验证方法、测试层级、AC 映射、环境/数据需求；
+- 每个 Acceptance Criterion 映射必须至少引用一个设计元素（`design_refs` 非空）；无法直接映射时必须引用明确记录受控例外的设计元素并说明 `exception.reason`，不得留空；
 - **不是测试执行结果**；G5 由 Testing Skill 执行；
 - 记录 Requirements AC → Design 验证方法 → Testing 用例的追踪。
 
@@ -523,10 +526,10 @@ Coding 遇到设计缺失时必须反馈/返回 `needs_input`，不得自行做�
 | 状态 | Design 语义 | 约束 |
 |------|-------------|------|
 | `ok` | 设计达到最低完整度，无 blocking 未决项 | **不等于 G2 通过/设计批准**；不得写 `design_approved` |
-| `needs_input` | 缺少需求/分析信息、设计选择需用户确认、关键 unknown | 必须返回 `questions`；可带部分 design |
+| `needs_input` | 缺少必要信息、需要调用方/用户补充、设计选择需用户确认、关键 unknown | 必须返回 `questions`；可带部分 design；不得把所有信息缺口都归为 `failed` |
 | `needs_approval` | 设计决策触发安全/高风险审批，需显式批准后才能定稿 | 只能表示待确认，**不得表示 G2 已通过**；不得自批；不得把 G2 本身作为 Design 的审批请求，G2 由 Orchestration 在 Design 完成后执行 |
-| `blocked` | 缺少上游 Artifact/权限/环境/外部依赖，无法继续 | 必须返回 `blocked_reason`；不得伪造完整设计 |
-| `failed` | 输入无效、内部错误、无法生成设计 | 至少一个 error；不得伪装 `ok` |
+| `blocked` | 缺少 Orchestration complexity、上游 Artifact 不可读、权限/环境/外部依赖不满足 | 必须返回 `blocked_reason`；不得伪造完整设计 |
+| `failed` | Schema 格式/类型错误、非法 enum、内部执行错误、无法恢复的处理异常 | 至少一个 error；不得把可补充的信息缺口伪装成 `failed` |
 
 **三层状态分离：**
 

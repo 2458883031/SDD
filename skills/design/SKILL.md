@@ -57,7 +57,7 @@ requires:
 
 ## 执行步骤
 
-1. **校验输入**：验证 `requirements_ref`（type=requirements）、`analysis_ref`（type=analysis）、`complexity`（L1/L2/L3）；输入缺失/无效 → `failed`。
+1. **校验输入**：验证 `requirements_ref`（type=requirements）、`analysis_ref`（type=analysis）、`complexity`（L1/L2/L3）和 Artifact 身份。Schema 格式/类型/枚举错误 → `failed`/`input_invalid`；缺少必要信息且需调用方/用户补充 → `needs_input`；`complexity` 未由 Orchestration 提供、上游不可读或权限/依赖阻塞 → `blocked`。
 2. **检查上游阻塞项**：Requirements 有 blocking open question/unknown/冲突 → `needs_input`/`blocked`；Analysis 有 blocking unknown/open question → `needs_input`/`blocked`。
 3. **建立 Requirements 追踪**：为 FR/NFR/constraints/dependencies/assumptions/unknowns/open_questions/acceptance_criteria/non_goals/source_refs 建立处理关系（designed/mapped/retained/resolved/not_applicable/deferred）。
 4. **建立 Analysis 追踪**：承接候选方案、风险、unknowns/open questions/design considerations；记录采纳/偏离/拒绝理由。
@@ -71,7 +71,7 @@ requires:
 
 ## 决策规则
 
-- 输入缺失/无效 → `failed`。
+- Schema 格式/类型/枚举错误 → `failed`/`input_invalid`；缺少必要信息且可补充 → `needs_input`；Orchestration complexity 缺失、上游不可读或权限/依赖阻塞 → `blocked`。
 - Requirements 存在 blocking 未决项 → `needs_input`/`blocked`，不得输出完整可实施的 `ok`。
 - Analysis 存在 blocking unknown/open question → `needs_input`/`blocked`。
 - 只有一个合理方案时，必须解释其他方案为何不适用/不可行；不得编造候选。
@@ -89,7 +89,7 @@ requires:
 
 - `status`: `ok | needs_input | needs_approval | blocked | failed`
 - `data.design`: 设计规格（summary/decisions/architecture/components/interfaces/data/state/failure/security/performance/migration/test_strategy（含 acceptance_criteria_mapping）/traceability/risks/assumptions/unknowns/open_questions）
-- `test_strategy.acceptance_criteria_mapping`: AC → 设计元素 → 验证方法；不是测试执行结果
+- `test_strategy.acceptance_criteria_mapping`: AC → 至少一个设计元素 `design_refs` → 验证方法；`design_refs` 必填且非空；无法直接映射时必须引用明确记录受控例外的设计元素并填写 `exception.reason`，不得留空；不是测试执行结果
 - `coverage`: 条件性设计区域记录 `designed` / `not_applicable` / `deferred` 及理由
 - `artifacts`: Design Artifact 引用（path/version/sha256/type=design）；`status=ok` 至少一个 design Artifact
 - `errors`: 标准错误对象；`failed` 时至少一个
@@ -107,13 +107,16 @@ Design Skill 只负责第 1 层并输出第 2 层的引用；G2/Gate 由 Orchest
 
 | 情况 | 处理 |
 |------|------|
-| Requirements/Analysis ref 缺失/类型错误 | `failed` |
+| Requirements/Analysis ref 类型错误、SHA 格式错误、非法复杂度枚举 | `failed`/`input_invalid` |
+| 缺少 requirements_ref/analysis_ref 或需用户补充的设计信息 | `needs_input` + `questions` |
+| complexity 未由 Orchestration 提供、上游 Artifact 不可读、权限/依赖阻塞 | `blocked`/`precondition_failed` |
 | 上游 blocking 未决项 | `needs_input`/`blocked` + 部分 design |
 | 无法形成设计决策 | `needs_input`；记录缺失信息 |
 | 推荐引用不存在 | `failed`/`needs_input` |
 | 证据不足 | 标记 unknown/assumption，降低 confidence |
 | 风险/成本无依据 | `unknown` + 依据/不确定性 |
 | 需要人工确认（非 G2） | 返回 `needs_approval`，不得表示 G2 已通过 |
+| 内部执行错误 | `failed`/`internal_error` |
 | 超时 | Orchestration 处理；本 Skill 返回 timeout 错误 |
 
 ## 安全约束
@@ -124,6 +127,17 @@ Design Skill 只负责第 1 层并输出第 2 层的引用；G2/Gate 由 Orchest
 - 安全/权限风险只记录建议，不重新定义 R0–R4/SA。
 - 不得通过 Design 输出构造审批绕过路径。
 
+## Artifact 路径与身份校验
+
+JSON Schema 只检查 ArtifactRef 的 `path` 非空、`type`、`version` 和 `sha256` 格式，**不验证**：
+
+- 路径规范化（相对/绝对、`.`/`..`、重复分隔符）；
+- 是否位于当前 `artifacts/{task-id}/` 任务目录内；
+- 目录穿越、符号链接越界、任务隔离；
+- Artifact 内容是否真实存在且 SHA-256 匹配。
+
+上述校验必须由调用层、ContextPort/ArtifactManager 或后续语义校验完成；未验证通过时不得读取或继续消费 Artifact。不得把“Input/Output Schema 通过”表述为“Artifact 身份、路径和内容已验证”。
+
 ## 验收标准
 
 - [ ] 输出通过 `output.schema.json`；
@@ -132,7 +146,8 @@ Design Skill 只负责第 1 层并输出第 2 层的引用；G2/Gate 由 Orchest
 - [ ] `analysis_traceability` 覆盖候选/风险/unknowns/design_considerations；
 - [ ] `status=ok` 至少包含一个 type=design 的 Artifact；
 - [ ] 设计决策有理由，偏离推荐有 rationale；
-- [ ] `test_strategy` 包含 AC/验证映射，且不冒充测试结果；
+- [ ] `test_strategy` 包含 AC/验证映射，`design_refs` 非空，且不冒充测试结果；
+- [ ] Artifact 路径已由调用层/语义校验确认任务目录归属与隔离；未确认时未继续消费；
 - [ ] 无 `implementation_plan`/`design_approved`/`gate_approved`/`confirmation_ref`；
 - [ ] 未静默删除上游约束/未决项；
 - [ ] Artifact 引用符合 ADR-005。
