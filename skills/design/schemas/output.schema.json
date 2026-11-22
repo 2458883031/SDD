@@ -1,0 +1,841 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sdd.local/skills/design/output.schema.json",
+  "title": "DesignOutput",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["status", "artifacts", "errors", "evidence"],
+  "properties": {
+    "status": {
+      "type": "string",
+      "enum": ["ok", "needs_input", "needs_approval", "blocked", "failed"]
+    },
+    "data": { "type": "object" },
+    "artifacts": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/designArtifactRef" }
+    },
+    "errors": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/error" }
+    },
+    "evidence": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/evidence" }
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "status": { "const": "ok" } }, "required": ["status"] },
+      "then": {
+        "required": ["data"],
+        "properties": {
+          "data": { "$ref": "#/$defs/okData" },
+          "errors": { "maxItems": 0 },
+          "artifacts": { "minItems": 1 }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "status": { "const": "needs_input" } }, "required": ["status"] },
+      "then": {
+        "required": ["data"],
+        "properties": { "data": { "$ref": "#/$defs/needsInputData" } }
+      }
+    },
+    {
+      "if": { "properties": { "status": { "const": "needs_approval" } }, "required": ["status"] },
+      "then": {
+        "required": ["data"],
+        "properties": { "data": { "$ref": "#/$defs/needsApprovalData" } }
+      }
+    },
+    {
+      "if": { "properties": { "status": { "const": "blocked" } }, "required": ["status"] },
+      "then": {
+        "required": ["data"],
+        "properties": { "data": { "$ref": "#/$defs/blockedData" } }
+      }
+    },
+    {
+      "if": { "properties": { "status": { "const": "failed" } }, "required": ["status"] },
+      "then": {
+        "properties": { "errors": { "minItems": 1 } }
+      }
+    }
+  ],
+  "$defs": {
+    "artifactRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "version", "sha256", "type"],
+      "properties": {
+        "path": { "type": "string", "minLength": 1 },
+        "version": { "type": "integer", "minimum": 1 },
+        "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}(?![\\s\\S])" },
+        "type": {
+          "type": "string",
+          "enum": ["requirements", "analysis", "design", "plan", "report", "other"]
+        }
+      }
+    },
+    "requirementsArtifactRef": {
+      "allOf": [
+        { "$ref": "#/$defs/artifactRef" },
+        { "properties": { "type": { "const": "requirements" } } }
+      ]
+    },
+    "analysisArtifactRef": {
+      "allOf": [
+        { "$ref": "#/$defs/artifactRef" },
+        { "properties": { "type": { "const": "analysis" } } }
+      ]
+    },
+    "designArtifactRef": {
+      "allOf": [
+        { "$ref": "#/$defs/artifactRef" },
+        { "properties": { "type": { "const": "design" } } }
+      ]
+    },
+    "error": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "message"],
+      "properties": {
+        "code": { "type": "string", "minLength": 1 },
+        "message": { "type": "string", "minLength": 1 },
+        "field": { "type": "string" },
+        "retryable": { "type": "boolean" },
+        "details": { "type": "object" }
+      }
+    },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "ref"],
+      "properties": {
+        "type": { "type": "string", "enum": ["test", "review", "command", "artifact", "other"] },
+        "ref": { "type": "string", "minLength": 1 },
+        "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}(?![\\s\\S])" },
+        "note": { "type": "string" }
+      }
+    },
+    "designSummary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["description", "goal", "scope", "non_goals"],
+      "properties": {
+        "description": { "type": "string", "minLength": 1 },
+        "goal": { "type": "string", "minLength": 1 },
+        "scope": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "non_goals": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "decisionItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["decision_id", "decision", "rationale", "decision_level"],
+      "properties": {
+        "decision_id": { "type": "string", "pattern": "^DEC-[A-Za-z0-9-]+$" },
+        "decision": { "type": "string", "minLength": 1 },
+        "rationale": { "type": "string", "minLength": 1 },
+        "alternatives_considered": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["name", "reason_for_rejection"],
+            "properties": {
+              "name": { "type": "string", "minLength": 1 },
+              "reason_for_rejection": { "type": "string", "minLength": 1 }
+            }
+          }
+        },
+        "related_requirements": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "related_analysis": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "consequences": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "decision_level": { "type": "string", "enum": ["key", "lightweight"] },
+        "deviation_from_recommendation": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["reason", "evidence_refs", "impact"],
+          "properties": {
+            "reason": { "type": "string", "minLength": 1 },
+            "evidence_refs": {
+              "type": "array",
+              "items": { "type": "string", "minLength": 1 }
+            },
+            "impact": { "type": "string", "minLength": 1 }
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "decision_level": { "const": "key" } }, "required": ["decision_level"] },
+          "then": {
+            "required": ["alternatives_considered", "consequences", "related_requirements"],
+            "properties": {
+              "alternatives_considered": { "minItems": 1 },
+              "consequences": { "minItems": 1 },
+              "related_requirements": { "minItems": 1 }
+            }
+          }
+        }
+      ]
+    },
+    "traceItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source_type", "source_id", "disposition"],
+      "properties": {
+        "source_type": {
+          "type": "string",
+          "enum": [
+            "functional_requirement", "non_functional_requirement", "constraint",
+            "dependency", "assumption", "unknown", "open_question",
+            "acceptance_criterion", "non_goal", "source_ref"
+          ]
+        },
+        "source_id": { "type": "string", "minLength": 1 },
+        "disposition": {
+          "type": "string",
+          "enum": ["designed", "mapped", "retained", "resolved", "not_applicable", "deferred"]
+        },
+        "design_refs": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "resolution_evidence_refs": {
+          "type": "array",
+          "items": {
+            "oneOf": [
+              { "type": "string", "pattern": "^[a-f0-9]{64}(?![\\s\\S])" },
+              { "type": "string", "pattern": "^(?!.*(?:^|/)\\.\\.?(?:/|@))(?!(?:.*[a-f0-9]{64}){2})(?:[A-Za-z0-9._-]+/)*[A-Za-z0-9._-]+@(?:0|[1-9][0-9]*)#[a-f0-9]{64}(?![\\s\\S])" }
+            ]
+          }
+        },
+        "rationale": { "type": "string" }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "disposition": { "enum": ["designed", "mapped"] } }, "required": ["disposition"] },
+          "then": {
+            "properties": { "design_refs": { "minItems": 1 } },
+            "required": ["design_refs"]
+          }
+        },
+        {
+          "if": { "properties": { "disposition": { "const": "resolved" } }, "required": ["disposition"] },
+          "then": {
+            "properties": { "resolution_evidence_refs": { "minItems": 1 } },
+            "required": ["resolution_evidence_refs"]
+          }
+        },
+        {
+          "if": { "properties": { "disposition": { "enum": ["not_applicable", "deferred"] } }, "required": ["disposition"] },
+          "then": {
+            "properties": { "rationale": { "type": "string", "minLength": 1 } },
+            "required": ["rationale"]
+          }
+        }
+      ]
+    },
+    "analysisTraceItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source_type", "source_id", "disposition"],
+      "properties": {
+        "source_type": {
+          "type": "string",
+          "enum": ["candidate", "risk", "unknown", "open_question", "design_consideration"]
+        },
+        "source_id": { "type": "string", "minLength": 1 },
+        "disposition": {
+          "type": "string",
+          "enum": ["adopted", "adapted", "rejected", "retained", "not_applicable", "deferred"]
+        },
+        "design_refs": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "rationale": { "type": "string" }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "disposition": { "enum": ["adopted", "adapted"] } }, "required": ["disposition"] },
+          "then": {
+            "properties": { "design_refs": { "minItems": 1 } },
+            "required": ["design_refs"]
+          }
+        },
+        {
+          "if": { "properties": { "disposition": { "enum": ["rejected", "retained", "not_applicable", "deferred"] } }, "required": ["disposition"] },
+          "then": {
+            "properties": { "rationale": { "type": "string", "minLength": 1 } },
+            "required": ["rationale"]
+          }
+        }
+      ]
+    },
+    "coverageItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["area", "status"],
+      "properties": {
+        "area": { "type": "string", "minLength": 1 },
+        "status": { "type": "string", "enum": ["designed", "not_applicable", "deferred"] },
+        "rationale": { "type": "string" },
+        "design_refs": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "status": { "const": "designed" } }, "required": ["status"] },
+          "then": {
+            "properties": { "design_refs": { "minItems": 1 } },
+            "required": ["design_refs"]
+          }
+        },
+        {
+          "if": { "properties": { "status": { "enum": ["not_applicable", "deferred"] } }, "required": ["status"] },
+          "then": {
+            "properties": { "rationale": { "type": "string", "minLength": 1 } },
+            "required": ["rationale"]
+          }
+        }
+      ]
+    },
+    "testStrategy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["approach", "levels", "acceptance_criteria_mapping", "verification_methods"],
+      "properties": {
+        "approach": { "type": "string", "minLength": 1 },
+        "levels": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "acceptance_criteria_mapping": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["criterion_ref", "verification_method"],
+            "properties": {
+              "criterion_ref": { "type": "string", "minLength": 1 },
+              "design_refs": {
+                "type": "array",
+                "items": { "type": "string", "minLength": 1 }
+              },
+              "verification_method": { "type": "string", "minLength": 1 }
+            }
+          }
+        },
+        "environments": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "data": { "type": "object" },
+        "verification_methods": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "designRisk": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["risk_id", "description", "category", "likelihood", "impact", "severity", "mitigation", "residual_risk", "status"],
+      "properties": {
+        "risk_id": { "type": "string", "pattern": "^RISK-[A-Za-z0-9-]+$" },
+        "description": { "type": "string", "minLength": 1 },
+        "category": { "type": "string", "enum": ["technical", "security", "performance", "operational", "data", "compliance", "delivery", "other"] },
+        "likelihood": { "type": "string", "enum": ["low", "medium", "high", "critical", "unknown"] },
+        "impact": { "type": "string", "enum": ["low", "medium", "high", "critical", "unknown"] },
+        "severity": { "type": "string", "enum": ["low", "medium", "high", "critical", "unknown"] },
+        "mitigation": { "type": "string", "minLength": 1 },
+        "residual_risk": { "type": "string", "enum": ["low", "medium", "high", "critical", "unknown"] },
+        "evidence_refs": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "status": { "type": "string", "enum": ["known", "suspected", "not_assessed"] }
+      }
+    },
+    "designAssumption": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "statement", "basis", "status"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^ASM-[A-Za-z0-9-]+$" },
+        "statement": { "type": "string", "minLength": 1 },
+        "basis": { "type": "string", "minLength": 1 },
+        "risk_if_wrong": { "type": "string" },
+        "status": { "type": "string", "enum": ["unconfirmed"] }
+      }
+    },
+    "designUnknown": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "description", "blocking", "status"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^UNK-[A-Za-z0-9-]+$" },
+        "description": { "type": "string", "minLength": 1 },
+        "impact": { "type": "string" },
+        "blocking": { "type": "boolean" },
+        "status": { "type": "string", "enum": ["unknown"] }
+      }
+    },
+    "openQuestion": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "question", "blocking", "status"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^Q-[A-Za-z0-9-]+$" },
+        "question": { "type": "string", "minLength": 1 },
+        "blocking": { "type": "boolean" },
+        "status": { "type": "string", "enum": ["open"] }
+      }
+    },
+    "changeImpact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["changed", "affected_areas", "rationale"],
+      "properties": {
+        "changed": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "affected_areas": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "affected_artifacts": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/artifactRef" }
+        },
+        "downstream_stages": {
+          "type": "array",
+          "items": { "type": "string", "enum": ["planning", "coding", "review", "testing", "documentation", "deployment"] }
+        },
+        "rationale": { "type": "string", "minLength": 1 },
+        "requires_redesign": { "type": "boolean" }
+      }
+    },
+    "architectureOverview": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["description"],
+      "properties": {
+        "description": { "type": "string", "minLength": 1 },
+        "system_boundary": { "type": "string" },
+        "deployment_view": { "type": "string" },
+        "runtime_view": { "type": "string" },
+        "external_systems": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "componentItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name", "responsibility"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "name": { "type": "string", "minLength": 1 },
+        "responsibility": { "type": "string", "minLength": 1 },
+        "boundary": { "type": "string" },
+        "dependencies": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "moduleItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name", "responsibility", "dependencies"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "name": { "type": "string", "minLength": 1 },
+        "responsibility": { "type": "string", "minLength": 1 },
+        "dependencies": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "interfaceItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name", "input", "output"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "name": { "type": "string", "minLength": 1 },
+        "input": { "type": "string", "minLength": 1 },
+        "output": { "type": "string", "minLength": 1 },
+        "errors": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "version": { "type": "string" },
+        "compatibility": { "type": "string" },
+        "idempotent": { "type": "boolean" }
+      }
+    },
+    "dataModelItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name", "description"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "name": { "type": "string", "minLength": 1 },
+        "description": { "type": "string", "minLength": 1 },
+        "fields": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["name", "type"],
+            "properties": {
+              "name": { "type": "string", "minLength": 1 },
+              "type": { "type": "string", "minLength": 1 },
+              "constraints": { "type": "string" },
+              "sensitive": { "type": "boolean" }
+            }
+          }
+        },
+        "relationships": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "sensitive": { "type": "boolean" },
+        "lifecycle": { "type": "string" }
+      }
+    },
+    "dataFlowItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name", "source", "destination"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "name": { "type": "string", "minLength": 1 },
+        "source": { "type": "string", "minLength": 1 },
+        "destination": { "type": "string", "minLength": 1 },
+        "transformations": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "sensitive": { "type": "boolean" }
+      }
+    },
+    "stateModel": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["entity", "states", "transitions"],
+      "properties": {
+        "entity": { "type": "string", "minLength": 1 },
+        "states": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "transitions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["from", "to", "event"],
+            "properties": {
+              "from": { "type": "string", "minLength": 1 },
+              "to": { "type": "string", "minLength": 1 },
+              "event": { "type": "string", "minLength": 1 }
+            }
+          }
+        },
+        "illegal_transitions": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "terminal_states": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "persistence": { "type": "string" }
+      }
+    },
+    "failureHandling": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["failure_classification", "retry_strategy"],
+      "properties": {
+        "failure_classification": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "retry_strategy": { "type": "string", "minLength": 1 },
+        "compensation": { "type": "string" },
+        "degradation": { "type": "string" },
+        "rollback_path": { "type": "string" }
+      }
+    },
+    "securityDesign": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["trust_boundaries", "reference_r0_r4_sa"],
+      "properties": {
+        "trust_boundaries": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "reference_r0_r4_sa": { "type": "string", "minLength": 1 },
+        "permission_model": { "type": "string" },
+        "data_protection": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "audit_requirements": { "type": "string" }
+      }
+    },
+    "performanceScalability": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["performance_targets", "capacity_assumptions"],
+      "properties": {
+        "performance_targets": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "capacity_assumptions": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "scalability_points": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "degradation_strategy": { "type": "string" },
+        "verification_method": { "type": "string" }
+      }
+    },
+    "migrationRollback": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["migration_steps", "rollback_plan"],
+      "properties": {
+        "migration_steps": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "rollback_plan": { "type": "string", "minLength": 1 },
+        "compatibility_strategy": { "type": "string" },
+        "data_backup": { "type": "string" }
+      }
+    },
+    "designContent": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "design_id": { "type": "string", "pattern": "^DESIGN-[A-Za-z0-9-]+$" },
+        "design_version": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(?:-[0-9A-Za-z.-]+)?(?:\\+[0-9A-Za-z.-]+)?$"
+        },
+        "created_at": { "type": "string", "format": "date-time" },
+        "source_requirements_ref": { "$ref": "#/$defs/requirementsArtifactRef" },
+        "source_analysis_ref": { "$ref": "#/$defs/analysisArtifactRef" },
+        "source_refs": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/artifactRef" }
+        },
+        "complexity": { "type": "string", "enum": ["L1", "L2", "L3"] },
+        "design_summary": { "$ref": "#/$defs/designSummary" },
+        "selected_solution": { "type": "string", "minLength": 1 },
+        "alternatives": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["name", "reason_for_rejection"],
+            "properties": {
+              "name": { "type": "string", "minLength": 1 },
+              "reason_for_rejection": { "type": "string", "minLength": 1 }
+            }
+          }
+        },
+        "decisions": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/decisionItem" }
+        },
+        "architecture_overview": { "$ref": "#/$defs/architectureOverview" },
+        "components": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/componentItem" }
+        },
+        "modules": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/moduleItem" }
+        },
+        "interfaces": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/interfaceItem" }
+        },
+        "data_models": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/dataModelItem" }
+        },
+        "data_flows": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/dataFlowItem" }
+        },
+        "state_model": { "$ref": "#/$defs/stateModel" },
+        "failure_handling": { "$ref": "#/$defs/failureHandling" },
+        "security_design": { "$ref": "#/$defs/securityDesign" },
+        "performance_scalability": { "$ref": "#/$defs/performanceScalability" },
+        "migration_rollback": { "$ref": "#/$defs/migrationRollback" },
+        "test_strategy": { "$ref": "#/$defs/testStrategy" },
+        "requirements_traceability": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["items"],
+          "properties": {
+            "items": {
+              "type": "array",
+              "minItems": 1,
+              "items": { "$ref": "#/$defs/traceItem" }
+            }
+          }
+        },
+        "analysis_traceability": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["items"],
+          "properties": {
+            "items": {
+              "type": "array",
+              "minItems": 1,
+              "items": { "$ref": "#/$defs/analysisTraceItem" }
+            }
+          }
+        },
+        "risks": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/designRisk" }
+        },
+        "assumptions": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/designAssumption" }
+        },
+        "unknowns": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/designUnknown" }
+        },
+        "open_questions": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/openQuestion" }
+        },
+        "design_change_impact": { "$ref": "#/$defs/changeImpact" },
+        "implementation_constraints": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "coverage": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/coverageItem" }
+        }
+      }
+    },
+    "designData": {
+      "allOf": [
+        { "$ref": "#/$defs/designContent" },
+        {
+          "required": [
+            "design_id", "design_version", "created_at",
+            "source_requirements_ref", "source_analysis_ref", "complexity",
+            "design_summary", "decisions", "architecture_overview",
+            "test_strategy", "requirements_traceability",
+            "analysis_traceability", "risks", "assumptions", "unknowns",
+            "open_questions"
+          ]
+        }
+      ]
+    },
+    "okData": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["design"],
+      "properties": {
+        "design": { "$ref": "#/$defs/designData" }
+      }
+    },
+    "needsInputData": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["questions"],
+      "properties": {
+        "questions": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "design": { "$ref": "#/$defs/designContent" }
+      }
+    },
+    "needsApprovalData": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["approval_request"],
+      "properties": {
+        "approval_request": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["gate_or_sa", "reason", "impact", "rollback"],
+          "properties": {
+            "gate_or_sa": {
+              "type": "string",
+              "minLength": 1,
+              "not": { "const": "G2" },
+              "description": "Design 不得请求 G2；G2 由 Orchestration 在 Design 完成后执行"
+            },
+            "reason": { "type": "string", "minLength": 1 },
+            "impact": { "type": "string", "minLength": 1 },
+            "rollback": { "type": "string", "minLength": 1 }
+          }
+        },
+        "design": { "$ref": "#/$defs/designContent" }
+      }
+    },
+    "blockedData": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["blocked_reason"],
+      "properties": {
+        "blocked_reason": { "type": "string", "minLength": 1 },
+        "design": { "$ref": "#/$defs/designContent" }
+      }
+    }
+  }
+}
