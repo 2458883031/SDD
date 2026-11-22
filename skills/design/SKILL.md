@@ -155,6 +155,9 @@ JSON Schema 只检查 ArtifactRef 的 `path` 非空、`type`、`version` 和 `sh
 ## 相关参考资料
 
 - [Design 标准](../../docs/standards/design-standard.md)
+- [Design Checklist](references/design-checklist.md)
+- [Examples](examples/)
+- [Cases](tests/cases.yaml)
 - [Requirements 标准](../../docs/standards/requirements-standard.md)
 - [Analysis 标准](../../docs/standards/analysis-standard.md)
 - [Skill 标准](../../docs/standards/skill-standard.md)
