@@ -1,0 +1,138 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sdd.local/skills/design/input.schema.json",
+  "title": "DesignInput",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["requirements_ref", "analysis_ref", "complexity"],
+  "properties": {
+    "requirements_ref": {
+      "$ref": "#/$defs/requirementsArtifactRef",
+      "description": "Requirements Artifact 引用；type 必须为 requirements"
+    },
+    "analysis_ref": {
+      "$ref": "#/$defs/analysisArtifactRef",
+      "description": "Analysis Artifact 引用；type 必须为 analysis"
+    },
+    "complexity": {
+      "type": "string",
+      "enum": ["L1", "L2", "L3"],
+      "description": "任务复杂度等级，由 Orchestration 提供；Design 不自行判定或降低"
+    },
+    "task_context": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "可选的任务上下文标识；不与 complexity 重复",
+      "properties": {
+        "task_id": { "type": "string", "pattern": "^task-[0-9]{8}-[a-z0-9]{4,36}$" },
+        "workflow_id": { "type": "string", "pattern": "^[a-z][a-z0-9-]{1,63}$" },
+        "node_id": { "type": "string", "pattern": "^[a-z][a-z0-9_-]{1,63}$" }
+      }
+    },
+    "requirements": {
+      "type": "object",
+      "description": "已解析的 Requirements data.requirements；由语义校验复用 requirements-clarity/output.schema.json，不在本文件重复定义"
+    },
+    "analysis": {
+      "type": "object",
+      "description": "已解析的 Analysis data.analysis；由语义校验复用 analysis skill output.schema.json，不在本文件重复定义"
+    },
+    "project_context": {
+      "type": "object",
+      "description": "项目上下文摘要；不得包含凭证",
+      "additionalProperties": true
+    },
+    "technical_context": {
+      "type": "object",
+      "description": "已知技术环境摘要；缺失项由 Design 标记 unknown",
+      "additionalProperties": true
+    },
+    "constraints": {
+      "type": "array",
+      "description": "调用方补充的业务、技术、时间或安全约束",
+      "items": { "type": "string", "minLength": 1 },
+      "default": []
+    },
+    "existing_design": {
+      "type": "array",
+      "description": "已有 Design Artifact 引用数组",
+      "items": { "$ref": "#/$defs/designArtifactRef" },
+      "default": []
+    },
+    "user_clarifications": {
+      "type": "array",
+      "description": "用户补充澄清；不得伪装为 Requirement 或已确认设计决定",
+      "items": { "type": "string", "minLength": 1 },
+      "default": []
+    },
+    "change_context": {
+      "$ref": "#/$defs/changeContext"
+    },
+    "requested_scope": {
+      "type": "string",
+      "minLength": 1,
+      "description": "本次设计范围"
+    },
+    "evidence_refs": {
+      "type": "array",
+      "description": "外部证据引用；不代表已由 Design 验证",
+      "items": { "type": "string", "minLength": 1 },
+      "default": []
+    }
+  },
+  "$defs": {
+    "artifactRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "version", "sha256", "type"],
+      "properties": {
+        "path": { "type": "string", "minLength": 1 },
+        "version": { "type": "integer", "minimum": 1 },
+        "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}(?![\\s\\S])" },
+        "type": {
+          "type": "string",
+          "enum": ["requirements", "analysis", "design", "plan", "report", "other"]
+        }
+      }
+    },
+    "requirementsArtifactRef": {
+      "allOf": [
+        { "$ref": "#/$defs/artifactRef" },
+        { "properties": { "type": { "const": "requirements" } } }
+      ]
+    },
+    "analysisArtifactRef": {
+      "allOf": [
+        { "$ref": "#/$defs/artifactRef" },
+        { "properties": { "type": { "const": "analysis" } } }
+      ]
+    },
+    "designArtifactRef": {
+      "allOf": [
+        { "$ref": "#/$defs/artifactRef" },
+        { "properties": { "type": { "const": "design" } } }
+      ]
+    },
+    "changeContext": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["reason", "changed_items"],
+      "properties": {
+        "reason": { "type": "string", "minLength": 1 },
+        "changed_items": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "previous_requirements": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/requirementsArtifactRef" }
+        },
+        "previous_analysis": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/analysisArtifactRef" }
+        }
+      }
+    }
+  }
+}

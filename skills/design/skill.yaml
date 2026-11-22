@@ -1,0 +1,25 @@
+schema_version: 1
+name: design
+version: 0.1.0
+status: draft
+license: MIT
+maintainers:
+  - role: owner
+    id: sdd-p1-reference
+dependencies:
+  skills:
+    - name: requirements-clarity
+      version: ">=0.2.0 <1.0.0"
+    - name: analysis
+      version: ">=0.1.0 <1.0.0"
+  tools: [file-read]
+compatibility:
+  requires_capabilities:
+    - skill-discovery
+    - skill-metadata
+    - tool-invocation
+    - context-port
+    - artifact-port
+    - result-port
+  optional_capabilities:
+    - approval-port
